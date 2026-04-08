@@ -82,6 +82,23 @@ Four evaluation suites in `eval/`:
 
 See `eval/README.md` for detailed instructions.
 
+## Code Comment Convention
+
+When modifying code, always add a standardized annotation comment above the new or changed module/function, using the following format:
+
+```
+### dace: <feature description> ###
+```
+
+Replace `<feature description>` with a concise explanation of the change or new functionality. This makes it easy to trace what was added or modified and why.
+
+**Example:**
+```python
+### dace: add multi-turn reward scaling for defender ###
+def compute_defender_reward(responses, turn_count):
+    ...
+```
+
 ## Data Format
 
 Training data uses Parquet format. Each example has fields: `data_source`, `prompt` (chat format), `ability`, `question`, `data_type` (vanilla_harmful/vanilla_benign), `adversarial`, `extra_info`. Data stored in `data/safety/`.
