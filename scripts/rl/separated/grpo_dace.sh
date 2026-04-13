@@ -50,7 +50,7 @@ timestamp=$(date '+%Y-%m-%d_%H-%M-%S')
 project_name=game
 # experiment_name="D-q257bi-A-q257bisft_wocode-reward1_0.5_0-woDformat-wo_label_reward-revised_label-${timestamp}"
 # experiment_name="D-q257bi-A-q257bisft_wocode-reward1_0.5_0-woDformat-wo_label_reward-revised_label-tp2-${timestamp}"
-experiment_name="DACE-Qwen2.5_7B_Instruct-wo_sft-$(timestamp)"
+experiment_name="DACE-Qwen2.5_7B_Instruct-wo_sft-${timestamp}"
 
 # DEFENDER BASE MODEL
 LLAMA_38BI_MODEL_PATH=$WORKSPACE/models/Meta-Llama-3-8B-Instruct/snapshots/8afb486c1db24fe5011ec46dfbe5b5dccdb575c2
