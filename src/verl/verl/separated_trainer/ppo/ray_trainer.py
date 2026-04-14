@@ -52,6 +52,9 @@ from torchdata.stateful_dataloader import StatefulDataLoader
 from verl.utils import torch_functional as verl_F
 from verl.separated_trainer.ppo.multi_agent_rollout import MultiAgentRollout
 from verl.utils.model import compute_position_id_with_mask
+### dace: import archive pool and strategy extraction ###
+from verl.separated_trainer.ppo.archive_pool import ArchivePool, ArchiveEntry
+from verl.utils.reward_score.game import extract_answer, extract_strategy_text
 
 
 
@@ -465,6 +468,16 @@ class RayReMASeparatedTrainer(object):
             self._build_switch_schedule()
         
         self._create_dataloader()
+
+        ### dace: initialize archive pool for diversity + replay ###
+        self.archive_pool = None
+        diversity_cfg = self.config.algorithm.get('diversity', {})
+        replay_cfg = self.config.algorithm.get('replay_pool', {})
+        if diversity_cfg.get('enable', False) or replay_cfg.get('enable', False):
+            self.archive_pool = ArchivePool(replay_cfg)
+            print(f"[DACE] Archive pool initialized: {self.archive_pool}")
+        self._prev_train_agent = None  # for detecting stage transitions
+        self._pending_success_buffer = []  # buffer for attack successes to add to pool at stage end
 
     def _validate_config(self):
         config = self.config
@@ -1336,6 +1349,11 @@ class RayReMASeparatedTrainer(object):
         with open(local_latest_checkpointed_iteration, 'w') as f:
             f.write(str(self.global_steps))
 
+        ### dace: save archive pool to checkpoint ###
+        if self.archive_pool is not None:
+            archive_path = os.path.join(local_global_step_folder, 'archive_pool.json')
+            self.archive_pool.save(archive_path)
+
     def _load_checkpoint(self):
         if self.config.trainer.resume_mode == 'disable':
             return 0
@@ -1390,6 +1408,14 @@ class RayReMASeparatedTrainer(object):
             self.train_dataloader.load_state_dict(dataloader_state_dict)
         else:
             print(f"Warning: No dataloader state found at {dataloader_local_path}, will start from scratch")
+
+        ### dace: restore archive pool from checkpoint ###
+        if self.archive_pool is not None:
+            archive_path = os.path.join(global_step_folder, 'archive_pool.json')
+            if os.path.exists(archive_path):
+                replay_cfg = self.config.algorithm.get('replay_pool', {})
+                self.archive_pool = ArchivePool.load(archive_path, replay_cfg)
+                print(f"[DACE] Restored archive pool: {self.archive_pool}")
 
     def _balance_batch(self, batch: DataProto, metrics, logging_prefix='global_seqlen'):
         """Reorder the data on single controller such that each dp rank gets similar total tokens"""
@@ -1543,6 +1569,302 @@ class RayReMASeparatedTrainer(object):
             return 'defender'
         return None
 
+    ### dace: compute diversity reward and inject into attacker turn-level reward ###
+    def _compute_and_inject_diversity_rewards(self, batch: DataProto, reward_tensor_map: dict, metrics: dict):
+        """Compute per-sample diversity reward based on strategy coverage.
+
+        Extracts strategy from attacker response, computes normalized marginal coverage gain,
+        applies differential lambda, injects into attacker_turn_level_reward, and buffers
+        successful attacks for later pool insertion.
+        """
+        diversity_cfg = self.config.algorithm.diversity
+        lambda_success = float(diversity_cfg.get('lambda_success', 1.0))
+        lambda_fail = float(diversity_cfg.get('lambda_fail', 0.5))
+        batch_size = len(batch)
+
+        import torch
+        div_rewards = torch.zeros(batch_size, dtype=torch.float32)
+        attack_success = reward_tensor_map.get('attack_success', torch.zeros(batch_size))
+
+        for i in range(batch_size):
+            history = batch.non_tensor_batch['history'][i]
+            # Find last attacker message
+            attacker_content = None
+            for msg in reversed(history):
+                if msg.get('role') == 'padding':
+                    continue
+                if msg.get('role') == 'attacker':
+                    attacker_content = msg.get('content', '')
+                    break
+            if not attacker_content:
+                continue
+
+            # Extract strategy index from <strategy> tags
+            strat_idx = ArchivePool.extract_strategy(attacker_content)
+            if strat_idx is None:
+                continue  # format reward already penalizes bad format
+
+            # Compute normalized marginal coverage gain
+            r_div = self.archive_pool.compute_diversity_reward(strat_idx)
+
+            # Differential lambda based on attack success
+            is_success = attack_success[i].item() > 0.5
+            lam = lambda_success if is_success else lambda_fail
+            div_rewards[i] = lam * r_div
+
+            # Buffer successful attack for pool insertion at stage end
+            if is_success:
+                extra_info_i = batch.non_tensor_batch.get('extra_info', [{}])[i] or {}
+                self._pending_success_buffer.append({
+                    'prompt_text': extract_answer(attacker_content) or attacker_content,
+                    'seed_prompt': extra_info_i.get('raw_prompt', ''),
+                    'data_type': batch.non_tensor_batch['data_type'][i],
+                    'strategy': strat_idx,
+                    'extra_info': extra_info_i,
+                    'prompt_data': {
+                        'question': batch.non_tensor_batch['question'][i],
+                        'data_source': batch.non_tensor_batch['data_source'][i],
+                        'data_type': batch.non_tensor_batch['data_type'][i],
+                        'prompt': batch.non_tensor_batch.get('prompt', [None])[i],
+                        'adversarial': batch.non_tensor_batch.get('adversarial', [''])[i],
+                        'reward_model': batch.non_tensor_batch['reward_model'][i],
+                        'extra_info': extra_info_i,
+                        'ability': batch.non_tensor_batch.get('ability', ['safety'])[i],
+                        'seed_prompt': extra_info_i.get('raw_prompt', ''),
+                        'input_template': batch.non_tensor_batch.get('input_template', [None])[i],
+                        'attacker_template': batch.non_tensor_batch.get('attacker_template', [None])[i],
+                    },
+                })
+
+        # Inject diversity reward into attacker_turn_level_reward at last turn
+        for i in range(batch_size):
+            num_turns = batch.non_tensor_batch['num_turns'][i]
+            batch.batch['attacker_turn_level_reward'][i, num_turns - 1] += div_rewards[i]
+
+        # Recompute attacker_turn_level_return after adding diversity reward
+        atk_reward = batch.batch['attacker_turn_level_reward']
+        atk_turn_mask = verl_F.get_turn_mask(atk_reward, batch.non_tensor_batch['num_turns'])
+        batch.batch['attacker_turn_level_return'] = core_algos.compute_turn_level_return(
+            atk_reward, atk_turn_mask, self.config.algorithm.gamma_turn_level)
+
+        # Log diversity metrics
+        metrics['diversity/mean_reward'] = div_rewards.mean().item()
+        metrics['diversity/nonzero_frac'] = (div_rewards != 0).float().mean().item()
+        metrics['diversity/pool_size'] = len(self.archive_pool)
+        metrics['diversity/coverage_entropy'] = self.archive_pool.compute_coverage_entropy()
+        n_occupied = int((self.archive_pool.slot_counts > 0).sum())
+        metrics['diversity/strategy_coverage'] = float(n_occupied) / ArchivePool.N_SLOTS
+        metrics['diversity/pending_buffer_size'] = len(self._pending_success_buffer)
+
+    ### dace: handle stage transitions for archive operations ###
+    def _handle_stage_transition(self, old_agent: str, new_agent: str):
+        """Called when training agent switches. Manages archive pool lifecycle.
+
+        - Always flushes pending success buffer to archive
+        - On defender->attacker transition (new round): time decay + prune
+        """
+        if self.archive_pool is None:
+            return
+
+        # Flush pending success buffer to archive
+        if self._pending_success_buffer:
+            n_added = 0
+            for item in self._pending_success_buffer:
+                entry = ArchiveEntry(
+                    prompt_text=item['prompt_text'],
+                    seed_prompt=item['seed_prompt'],
+                    data_type=item['data_type'],
+                    strategy=item['strategy'],
+                    extra_info=item['extra_info'],
+                    successes=1.0,
+                    failures=0.0,
+                    step_added=self.global_steps,
+                    prompt_data=item['prompt_data'],
+                )
+                if self.archive_pool.add_entry(entry):
+                    n_added += 1
+            print(f"[DACE] Flushed {n_added} new entries to archive (total: {len(self.archive_pool)})")
+            self._pending_success_buffer.clear()
+
+        # When new round starts (defender->attacker transition): time decay + prune
+        if old_agent == 'defender' and new_agent == 'attacker':
+            replay_cfg = self.config.algorithm.get('replay_pool', {})
+            if replay_cfg.get('enable', False):
+                self.archive_pool.time_decay()
+                self.archive_pool.prune()
+                print(f"[DACE] New round: decay + prune → pool size = {len(self.archive_pool)}")
+
+    ### dace: build replay batch from archive via Thompson Sampling ###
+    def _build_replay_gen_batch(self, base_meta_info: dict):
+        """Sample from archive pool and construct DataProto for defender rollout.
+
+        Returns (replay_batch, entry_indices) or (None, []) if pool insufficient.
+        Uses the 'adversarial' field + is_replay flag to inject archived attacker prompts.
+        """
+        replay_cfg = self.config.algorithm.replay_pool
+        replay_size = int(replay_cfg.get('replay_batch_size', 32))
+
+        if len(self.archive_pool) < replay_size:
+            return None, []
+
+        sampled = self.archive_pool.thompson_sample(replay_size)
+        if not sampled:
+            return None, []
+
+        entry_indices = [idx for idx, _ in sampled]
+        entries = [entry for _, entry in sampled]
+
+        # Build batch_dict matching dataloader output format
+        batch_dict = defaultdict(list)
+        for entry in entries:
+            pd = entry.prompt_data
+            for key in ['question', 'data_source', 'data_type', 'prompt',
+                         'reward_model', 'extra_info', 'ability', 'seed_prompt',
+                         'input_template', 'attacker_template']:
+                batch_dict[key].append(pd.get(key))
+            # Set 'adversarial' to the archived attacker prompt text for injection
+            batch_dict['adversarial'].append(entry.prompt_text)
+
+        import torch as _torch
+        for key in batch_dict:
+            batch_dict[key] = np.array(batch_dict[key], dtype=object)
+        batch_dict['batch_idx'] = _torch.arange(0, len(entries))
+
+        meta_info = dict(base_meta_info)
+        meta_info['train_role'] = 'defender'
+        meta_info['is_replay'] = True
+
+        replay_batch = DataProto.from_single_dict(batch_dict, meta_info=meta_info)
+        replay_batch.non_tensor_batch['uid'] = np.array(
+            [f'replay_{uuid.uuid4()}' for _ in range(len(entries))],
+            dtype=object
+        )
+        replay_batch = replay_batch.repeat(
+            repeat_times=self.config.actor_rollout_ref.rollout.n, interleave=True
+        )
+
+        return replay_batch, entry_indices
+
+    ### dace: run replay samples through rollout + reward + posterior update ###
+    def _run_replay_pipeline(self, base_meta_info: dict, metrics: dict):
+        """Full replay pipeline: sample → generate → reward → posterior update.
+
+        Returns processed DataProto ready for merging with new batch, or None.
+        """
+        replay_batch, entry_indices = self._build_replay_gen_batch(base_meta_info)
+        if replay_batch is None:
+            return None
+
+        import torch as _torch
+
+        # Prepare gen_batch (mirror main flow)
+        gen_batch = replay_batch.select(
+            batch_keys=['batch_idx'],
+            non_tensor_batch_keys=[k for k in replay_batch.non_tensor_batch.keys()
+                if k not in ['data_source', 'ability', 'reward_model', 'extra_info', 'uid']],
+            meta_info_keys=['agent_roles', 'finish_flag', 'system_prompts'],
+            deepcopy=True
+        )
+        gen_batch.meta_info['train_role'] = 'defender'
+        gen_batch.meta_info['is_replay'] = True
+
+        # Generate defender responses (attacker response injected from 'adversarial' field)
+        gen_output = self.multi_turn_generate_sequences(gen_batch)
+        replay_batch = replay_batch.union(gen_output)
+
+        # Compute global attention
+        global_attention = None
+        for role in replay_batch.meta_info['agent_roles']:
+            attn_key = f'{role}_attention_mask'
+            if attn_key in replay_batch.batch:
+                role_mask = replay_batch.batch[attn_key]
+                global_attention = role_mask if global_attention is None else global_attention + role_mask
+        if global_attention is not None:
+            replay_batch.meta_info['global_token_num'] = _torch.sum(global_attention, dim=-1).tolist()
+
+        # Reward computation
+        replay_batch.meta_info['mask_unfinished_reward'] = self.config.reward_model.mask_unfinished_reward
+        replay_batch.meta_info['use_format_reward'] = self.config.reward_model.get('use_format_reward', False)
+        replay_batch.meta_info['use_dace_format'] = self.config.algorithm.get('diversity', {}).get('use_dace_format', False)
+        format_reward_roles = self.config.reward_model.get('format_reward_roles', None)
+        if format_reward_roles is not None:
+            format_reward_roles = list(format_reward_roles)
+        replay_batch.meta_info['format_reward_roles'] = format_reward_roles
+
+        replay_reward_map = self.reward_fn(replay_batch)
+        replay_batch.batch['acc'] = replay_reward_map.pop('acc')
+        for key, tensor in replay_reward_map.items():
+            replay_batch.batch[key] = tensor
+            if tensor.dim() < 2 or not key.endswith('_turn_level_reward'):
+                continue
+            turn_mask = verl_F.get_turn_mask(tensor, replay_batch.non_tensor_batch['num_turns'])
+            key_return = key.replace('reward', 'return')
+            replay_batch.batch[key_return] = core_algos.compute_turn_level_return(
+                tensor, turn_mask, self.config.algorithm.gamma_turn_level)
+
+        # Posterior update: group G rollouts per uid, check if ANY was harmful
+        attack_success = replay_reward_map.get('attack_success', _torch.zeros(len(replay_batch)))
+        uid_to_successes = defaultdict(list)
+        for i, uid in enumerate(replay_batch.non_tensor_batch['uid']):
+            uid_to_successes[uid].append(attack_success[i].item() > 0.5)
+
+        # Map unique uids back to entry_indices (pre-repeat order)
+        seen_uids = []
+        for uid in replay_batch.non_tensor_batch['uid']:
+            if uid not in seen_uids:
+                seen_uids.append(uid)
+
+        for j, uid in enumerate(seen_uids):
+            if j < len(entry_indices):
+                any_harmful = any(uid_to_successes[uid])
+                self.archive_pool.update_posterior(entry_indices[j], any_harmful)
+
+        # Prune after posterior update
+        self.archive_pool.prune()
+
+        # Buffer new successful attacks from replay for pool
+        for i in range(len(replay_batch)):
+            if attack_success[i].item() > 0.5:
+                history = replay_batch.non_tensor_batch['history'][i]
+                attacker_content = None
+                for msg in reversed(history):
+                    if msg.get('role') == 'padding':
+                        continue
+                    if msg.get('role') == 'attacker':
+                        attacker_content = msg.get('content', '')
+                        break
+                if attacker_content:
+                    strat_idx = ArchivePool.extract_strategy(attacker_content)
+                    if strat_idx is not None:
+                        extra_info_i = replay_batch.non_tensor_batch.get('extra_info', [{}])[i] or {}
+                        self._pending_success_buffer.append({
+                            'prompt_text': extract_answer(attacker_content) or attacker_content,
+                            'seed_prompt': extra_info_i.get('raw_prompt', ''),
+                            'data_type': replay_batch.non_tensor_batch['data_type'][i],
+                            'strategy': strat_idx,
+                            'extra_info': extra_info_i,
+                            'prompt_data': {
+                                k: replay_batch.non_tensor_batch.get(k, [None])[i]
+                                for k in ['question', 'data_source', 'data_type', 'prompt',
+                                           'adversarial', 'reward_model', 'extra_info', 'ability',
+                                           'seed_prompt', 'input_template', 'attacker_template']
+                            },
+                        })
+
+        # Replay metrics
+        metrics['replay/batch_size'] = len(entry_indices)
+        metrics['replay/pool_size'] = len(self.archive_pool)
+        if self.archive_pool.entries:
+            metrics['replay/pool_mean_posterior'] = float(np.mean([
+                (self.archive_pool.alpha_prior + e.successes)
+                / (self.archive_pool.alpha_prior + e.successes + self.archive_pool.beta_prior + e.failures)
+                for e in self.archive_pool.entries
+            ]))
+        else:
+            metrics['replay/pool_mean_posterior'] = 0.0
+
+        return replay_batch
+
     def fit(self):
         """
         The training loop of PPO.
@@ -1607,6 +1929,9 @@ class RayReMASeparatedTrainer(object):
 
         for epoch in range(self.config.trainer.total_epochs):
             self._update_current_train_agent(epoch=epoch)
+            ### dace: init prev_train_agent for stage transition detection ###
+            if self._prev_train_agent is None:
+                self._prev_train_agent = self._current_train_agent
             for batch_dict in self.train_dataloader:
                 metrics = {}
                 timing_raw = {}
@@ -1715,6 +2040,8 @@ class RayReMASeparatedTrainer(object):
                         if format_reward_roles is not None:
                             format_reward_roles = list(format_reward_roles)
                         new_batch.meta_info['format_reward_roles'] = format_reward_roles
+                        ### dace: pass use_dace_format for 3-tag format reward ###
+                        new_batch.meta_info['use_dace_format'] = self.config.algorithm.get('diversity', {}).get('use_dace_format', False)
                         # rule-based rm build token-level reward_tensor_map for each agent
                         # {
                         #     "attacker_turn_level_reward": tensor([...], device='cuda:0'),
@@ -1735,7 +2062,27 @@ class RayReMASeparatedTrainer(object):
                             # compute turn_level return with turn_level_gamma
                             new_batch.batch[key_return] = core_algos.compute_turn_level_return(
                                 reward_tensor, turn_mask, self.config.algorithm.gamma_turn_level)
-                    
+
+                    ### dace: inject diversity reward into attacker reward ###
+                    if (self.archive_pool is not None
+                        and self.config.algorithm.get('diversity', {}).get('enable', False)
+                        and self._current_train_agent == 'attacker'):
+                        self._compute_and_inject_diversity_rewards(new_batch, reward_tensor_map, metrics)
+
+                    ### dace: attack success rate metric ###
+                    if 'attack_success' in reward_tensor_map:
+                        metrics['attack/success_rate'] = reward_tensor_map['attack_success'].mean().item()
+
+                    ### dace: replay batch for defender mixed training ###
+                    if (self._current_train_agent == 'defender'
+                        and self.archive_pool is not None
+                        and self.config.algorithm.get('replay_pool', {}).get('enable', False)):
+                        with _timer('replay', timing_raw):
+                            replay_processed = self._run_replay_pipeline(base_rollout_meta_info, metrics)
+                            if replay_processed is not None:
+                                new_batch = DataProto.concat([new_batch, replay_processed])
+                                print(f"[DACE] Merged replay batch, total batch size = {len(new_batch)}")
+
                     # statistics for group filter
                     if self.config.actor_rollout_ref.rollout.n > 1:
                         # key_reward = list(reward_tensor_map.keys())[0]
@@ -1923,6 +2270,13 @@ class RayReMASeparatedTrainer(object):
 
                 self.global_steps += 1
                 self._update_current_train_agent(metrics=metrics)
+
+                ### dace: detect stage transition and trigger archive operations ###
+                if self.archive_pool is not None:
+                    new_agent = self._current_train_agent
+                    if self._prev_train_agent is not None and self._prev_train_agent != new_agent:
+                        self._handle_stage_transition(self._prev_train_agent, new_agent)
+                    self._prev_train_agent = new_agent
 
     def _save_train_generations(self, batch: DataProto):
         # save train generations

@@ -23,6 +23,9 @@ from verl import DataProto
 from verl.utils.reward_score.game import (
     RewardScores,
     format_reward_func,
+    ### dace: import 3-tag format reward and strategy extraction ###
+    format_reward_func_dace,
+    extract_strategy_text,
     extract_answer,
     extract_think,
     # revision_reward_func,
@@ -39,8 +42,11 @@ def compute_score_fn(compute_score, params):
     return compute_score(data_source, attacker_prompt, defender_response, extra_info)
 
 
-def compute_format_r(data_source, role, response_str):
+### dace: dispatch to 3-tag format reward for DACE attacker ###
+def compute_format_r(data_source, role, response_str, *, use_dace_format=False):
     if data_source == "game":
+        if use_dace_format and role == 'attacker':
+            return format_reward_func_dace(response_str)
         return format_reward_func(response_str)
     else:
         raise ValueError(f'Unknown {data_source=} for format reward.')
@@ -302,6 +308,11 @@ class GameRewardManager:
             [score.label_reward for score in score_bundles],
             dtype=torch.float32,
         )
+        ### dace: export attack_success flag for archive pool ###
+        reward_tensor_map['attack_success'] = torch.tensor(
+            [1.0 if score.attack_success else 0.0 for score in score_bundles],
+            dtype=torch.float32,
+        )
         format_rewards = torch.zeros(len(data), dtype=torch.float32)
         for i_bsz in range(len(data)):
             data_item = data[i_bsz]
@@ -336,7 +347,10 @@ class GameRewardManager:
                         and role in train_roles and role in format_reward_roles):
                     last_role_msg = _get_last_role_message(valid_history, role)
                     if last_role_msg is not None:
-                        format_r = compute_format_r(data_source, role, last_role_msg['content'])
+                        ### dace: pass use_dace_format for 3-tag format reward ###
+                        use_dace_format = data_item.meta_info.get('use_dace_format', False)
+                        format_r = compute_format_r(data_source, role, last_role_msg['content'],
+                                                    use_dace_format=use_dace_format)
                         role_score += format_r
                         format_bonus += format_r
                         role_format_rewards[role][i_bsz] = format_r

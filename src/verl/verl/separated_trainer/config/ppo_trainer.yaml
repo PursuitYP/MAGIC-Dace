@@ -235,6 +235,26 @@ algorithm:
       - /fs-computility/mabasic/shared/models/Qwen2.5-3B-Instruct
       - /fs-computility/mabasic/shared/models/Qwen2.5-3B-Instruct
 
+  # --- DACE: Attack Diversity ---
+  diversity:
+    enable: false
+    reward_type: coverage       # 'coverage' or 'novelty'
+    lambda_success: 1.0         # diversity coefficient when attack succeeds
+    lambda_fail: 0.5            # diversity coefficient when attack fails
+    epsilon: 1.0e-8             # smoothing for coverage denominator
+    use_dace_format: false      # enable 3-tag format reward for attacker
+
+  # --- DACE: Bayesian Adversarial Replay Pool ---
+  replay_pool:
+    enable: false
+    replay_batch_size: 32       # B_replay per defender step
+    gamma_decay: 0.97           # time decay factor per round
+    prune_threshold: 0.05       # epsilon: prune if posterior mean < this
+    prune_min_trials: 5.0       # n_min: minimum trials before pruning
+    max_pool_size: 5000         # max entries in archive
+    alpha_prior: 1.0            # Beta prior alpha
+    beta_prior: 1.0             # Beta prior beta
+
 trainer:
   balance_batch: True
   total_epochs: 30

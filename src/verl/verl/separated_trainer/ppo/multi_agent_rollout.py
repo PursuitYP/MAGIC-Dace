@@ -624,10 +624,12 @@ class MultiAgentRollout:
                     idx = unfinished_indices[i]
                     conversation_history[role][idx] = chat
 
+                ### dace: also skip attacker generation for replay batches ###
+                is_replay = data_proto.meta_info.get('is_replay', False)
                 if (role == agent_roles[0]
                         and train_role == agent_roles[1]
-                        and self.use_adversarial_prompt_for_defender
-                        and self.skip_attacker_generation_for_defender):
+                        and (is_replay or (self.use_adversarial_prompt_for_defender
+                                          and self.skip_attacker_generation_for_defender))):
                     adv_positions = []
                     adv_outputs = []
                     for pos, idx in enumerate(unfinished_indices):
