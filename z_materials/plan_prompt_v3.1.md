@@ -9,7 +9,7 @@
 
 ## 参考材料
 
-@z_materials/MAGIC_Latex/arxiv.tex ，这是 MAGIC baseline 论文的 latex 源码。
+@z_materials/MAGIC_Latex/arxiv.tex ，这是 MAGIC baseline 论文的 latex 源码（包含其伪代码）。
 @z_materials/研究方法v3.1.md ，这是我们在 MAGIC 基础上引入多样性和回放池的研究方法。
 @z_materials/pseudocode_v3.1.html ，这是与我们的研究方法v3.1对应的详细的伪代码。
 @data/safety/preprocess_dace.py ，这是我们方法的数据预处理的步骤和 prompt 内容。
@@ -150,6 +150,7 @@ algorithm:
     n_min: 5.0             # 最小试验次数阈值
     replay_ratio: 0.5      # B_replay / B_train 的比例（0.5 或 0.25）
 ```
+注意区分这里的两个 epsilon 参数：diversity.epsilon 和 replay_pool.epsilon
 
 ---
 
