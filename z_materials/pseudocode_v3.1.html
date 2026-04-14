@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>Diversity-Driven Co-Evolution — Pseudocode v3.1</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js"></script>
+<style>
+  :root {
+    --bg:#fff; --fg:#1a1a2e; --accent:#2563eb; --border:#d1d5db;
+    --bg-algo:#f8fafc; --kw:#7c3aed; --cm:#6b7280; --ln-c:#9ca3af;
+    --s1:#2563eb; --s2:#059669; --s3:#dc2626;
+    --def-bg:#f0f4ff; --def-border:#bfdbfe;
+    --hl:#eef2ff;
+  }
+  @media(prefers-color-scheme:dark){:root{
+    --bg:#0f1117; --fg:#e4e4e7; --accent:#60a5fa; --border:#374151;
+    --bg-algo:#161922; --kw:#c4b5fd; --cm:#9ca3af; --ln-c:#4b5563;
+    --s1:#60a5fa; --s2:#34d399; --s3:#f87171;
+    --def-bg:#1e2333; --def-border:#334155;
+    --hl:#1c2030;
+  }}
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Noto Sans SC','Inter',-apple-system,sans-serif;background:var(--bg);color:var(--fg);line-height:1.72;padding:28px 20px;max-width:940px;margin:0 auto}
+  h1{font-size:1.35em;font-weight:700;color:var(--accent);margin-bottom:4px}
+  .sub{font-size:.88em;color:var(--cm);margin-bottom:22px}
+
+  .def{background:var(--def-bg);border:1px solid var(--def-border);border-radius:8px;padding:16px 20px;margin-bottom:14px}
+  .def h3{font-size:.92em;font-weight:700;color:var(--accent);margin-bottom:8px}
+  .def p,.def li{font-size:.86em;line-height:1.75}
+  .def ul{padding-left:16px;margin-top:4px}
+  .math-row{text-align:center;margin:8px 0;font-size:1em}
+
+  .algo{background:var(--bg-algo);border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:20px}
+  .algo-hdr{background:var(--accent);color:#fff;padding:11px 20px;font-weight:700;font-size:.97em}
+  .algo-body{padding:16px 20px;font-size:.85em;line-height:2.05}
+
+  .L{display:flex;align-items:flex-start;gap:8px}
+  .n{min-width:24px;text-align:right;color:var(--ln-c);font-size:.8em;user-select:none;padding-top:1px;font-family:'JetBrains Mono','Fira Code',monospace}
+  .c{flex:1}
+  .i1{padding-left:22px} .i2{padding-left:44px} .i3{padding-left:66px}
+  .kw{color:var(--kw);font-weight:600}
+  .cm{color:var(--cm);font-style:italic}
+  .fn{color:var(--s3)}
+  .bl{height:6px}
+  .sep{border-top:1px dashed var(--border);margin:5px 0}
+
+  .tag{display:inline-block;padding:1px 7px;border-radius:4px;font-size:.8em;font-weight:700;margin-right:3px}
+  .t1{background:#dbeafe;color:#1e40af}
+  .t2{background:#d1fae5;color:#065f46}
+  @media(prefers-color-scheme:dark){
+    .t1{background:#1e3a5f;color:#93c5fd}
+    .t2{background:#064e3b;color:#6ee7b7}
+  }
+
+  .note{font-size:.82em;color:var(--cm);margin-top:12px;padding:10px 14px;border-left:3px solid var(--border);background:var(--hl);border-radius:0 6px 6px 0}
+</style>
+</head>
+<body>
+
+<h1>Diversity-Driven LLM Safety Co-Evolution</h1>
+<p class="sub">基于多样性驱动的 LLM 安全攻防协同演化框架 — 伪代码 v3.1（两阶段，混合 batch 防御者训练）</p>
+
+<!-- ═══ Def 1: Strategy Space ═══ -->
+<div class="def">
+  <h3>定义 1：攻击策略空间</h3>
+  <p>二维攻击策略空间 $\mathcal{B} = \mathcal{S} \times \mathcal{C}$，$\mathcal{S}$ = 风险类别（$|\mathcal{S}|$ 类），$\mathcal{C}$ = 攻击方式（$|\mathcal{C}|$ 种）。每个攻击样本 $x$ 映射到 $b(x) = (s,c) \in \mathcal{B}$。</p>
+</div>
+
+<!-- ═══ Def 2: Unified Archive / Replay Pool ═══ -->
+<div class="def">
+  <h3>定义 2：统一攻击档案池（Archive &amp; Replay Pool）</h3>
+  <p>统一攻击档案池 $\mathcal{A}$ 同时承担策略频次记录（多样性奖励）与贝叶斯回放（防御者补训）两项功能。池中存储所有攻击成功的改写 prompt（不含防御者回复），每个样本 $x_i$ 维护：</p>
+  <ul>
+    <li><b>策略频次</b>：$b(x_i)$ 所在槽位的累计频次 $n(b)$，用于计算策略分布 $\mathbf{p}_{\mathcal{A}}$ 与多样性奖励</li>
+    <li><b>Beta-Bernoulli 后验</b>：$p_i \mid s_i, f_i \;\sim\; \text{Beta}(\alpha + s_i,\; \beta + f_i)$，其中 $s_i$、$f_i$ 分别为该样本的衰减累计攻破次数与拒绝次数</li>
+    <li><b>后验均值</b> $\hat{p}_i$（posterior mean）：衡量样本 $x_i$ 对当前防御者的<b>期望攻破概率</b>，公式为
+      <div class="math-row">$\hat{p}_i = \dfrac{\alpha + s_i}{\alpha + s_i + \beta + f_i}$</div>
+      用于剪枝判断——后验均值极低的样本表明防御者已充分掌握该攻击模式，应从池中移除</li>
+    <li><b>Thompson 采样值</b> $\tilde{p}_i$（sampled risk score）：从后验分布中<b>随机采样</b>的一次抽样值 $\tilde{p}_i \sim \text{Beta}(\alpha\!+\!s_i, \beta\!+\!f_i)$，用于回放采样——通过随机性实现探索-利用平衡，偏好不确定性高或期望攻破概率高的样本</li>
+  </ul>
+  <p style="margin-top:6px"><b>入池</b>：Stage 1 / Stage 2 训练结束后，各自将本阶段攻击成功样本放入池中</p>
+  <p><b>时间衰减</b>：处理非平稳性，每轮开始 $s_i \leftarrow \gamma s_i$，$f_i \leftarrow \gamma f_i$（$\gamma \in [0.95,0.99]$）</p>
+  <p><b>剪枝</b>：$\hat{p}_i < \epsilon$ 且 $(s_i\!+\!f_i) > n_{\min}$ 时移除，保持池中样本对当前防御者的有效性</p>
+</div>
+
+<!-- ═══ Def 3: Reward Design ═══ -->
+<div class="def">
+  <h3>定义 3：奖励设计</h3>
+  <p>参考 MAGIC 的零和博弈奖励结构。攻防双方的 harmfulness 奖励 $R_{\text{harm}}$ 与 refusal 奖励 $R_{\text{ref}}$ 互为相反数：</p>
+  <div class="math-row">
+    $R_D = R_{\text{harm}}(y_D) + R_{\text{ref}}(y_D)$
+  </div>
+  <div class="math-row">
+    $R_A = \underbrace{-R_{\text{harm}}(y_D) - R_{\text{ref}}(y_D)}_{\text{零和部分}~=~-R_D} + R_{\text{fmt}}(y_A) + \lambda \cdot R_{\text{div}}(x)$
+  </div>
+  <ul>
+    <li>$R_{\text{harm}}$：防御者响应安全性（safe → $+r_{\text{harm}}$，harmful → $-r_{\text{harm}}$）</li>
+    <li>$R_{\text{ref}}$：拒答校准（正确拒答/正确回答 → $+r_{\text{ref}}$，错误拒答/错误回答 → $-r_{\text{ref}}$）</li>
+    <li>$R_{\text{fmt}}$：攻击者格式合规奖励（仅攻击者）</li>
+    <li>$R_{\text{div}}$：归一化边际覆盖增益（仅攻击者），$\lambda$ 根据攻击成败差异化（成功 $1.0$，失败 $0.5$）</li>
+  </ul>
+</div>
+
+<!-- ═══ Def 4: Diversity Reward ═══ -->
+<div class="def">
+  <h3>定义 4：归一化边际覆盖增益（多样性奖励，Coverage）</h3>
+  <div class="math-row">
+    $R_{\text{div}}(x) = \dfrac{H(\mathbf{p}_{\mathcal{A} \cup \{x\}}) - H(\mathbf{p}_{\mathcal{A}})}{\max_{b \in \mathcal{B}} \bigl[H(\mathbf{p}_{\mathcal{A} \cup \{x_b\}}) - H(\mathbf{p}_{\mathcal{A}})\bigr] + \epsilon}$
+  </div>
+  <ul>
+    <li>分子 = 样本 $x$ 的实际边际熵增；分母 = 当前档案池下单步最优边际增益（batch 内共享）</li>
+    <li>两者均为 $O(1/|\mathcal{A}|)$，比值恒为 $O(1)$，消除 reward vanishing</li>
+    <li>落入低频槽位 → 高奖励（≈1）；落入饱和槽位 → 低/负奖励</li>
+    <li>KL 视角：等价于单步 KL 收缩效率——样本使 $\mathbf{p}_{\mathcal{A}}$ 向均匀分布 $\mathbf{u}$ 收缩的实际 KL 减少量占单步最优减少量的比例</li>
+  </ul>
+</div>
+
+<!-- ═══ Main Algorithm ═══ -->
+<div class="algo">
+  <div class="algo-hdr">Algorithm 1 &nbsp;多样性驱动的 LLM 安全攻防协同演化（两阶段，Attacker 先手，混合 batch 防御者训练）</div>
+  <div class="algo-body">
+
+    <div class="L"><span class="n"></span><span class="c"><span class="kw">Require:</span> 攻击者 $\pi_A$，防御者 $\pi_D$，种子数据集 $\mathcal{D}_{\text{RL}}$，攻击策略空间 $\mathcal{B} = \mathcal{S} \times \mathcal{C}$，Safety Judge $J$，统一攻击档案池 $\mathcal{A} \leftarrow \emptyset$，</span></div>
+    <div class="L"><span class="n"></span><span class="c">&emsp;&emsp;&emsp;&emsp;每阶段训练步数 $T$，GRPO 组大小 $G$，轮数 $K$，训练批大小 $B_{\text{train}}$，回放批大小 $B_{\text{replay}}$（$= B_{\text{train}}/2$ 或 $B_{\text{train}}/4$）</span></div>
+
+    <div class="bl"></div>
+    <div class="L"><span class="n"></span><span class="c"><span class="kw">Phase 1: Initialization</span></span></div>
+    <div class="L"><span class="n">1</span><span class="c">$\pi_A \leftarrow \text{SFT}(\pi_A, \mathcal{D}_{\text{sft}})$ <span class="cm">// 攻击者 SFT 热启动</span></span></div>
+    <div class="L"><span class="n">2</span><span class="c">$\pi_D \leftarrow$ Base Model</span></div>
+
+    <div class="bl"></div>
+    <div class="L"><span class="n"></span><span class="c"><span class="kw">Phase 2: Co-evolution</span></span></div>
+    <div class="L"><span class="n">3</span><span class="c"><span class="kw">for</span> round $k = 1$ <span class="kw">to</span> $K$ <span class="kw">do</span></span></div>
+
+    <div class="bl"></div>
+    <div class="L"><span class="n"></span><span class="c i1"><span class="cm">// ── 每轮开始：对池中所有样本执行时间衰减 ──</span></span></div>
+    <div class="L"><span class="n">4</span><span class="c i1"><span class="kw">for each</span> $x_i \in \mathcal{A}$ <span class="kw">do</span> $s_i \leftarrow \gamma\, s_i$，$f_i \leftarrow \gamma\, f_i$</span></div>
+
+    <!-- ── Stage 1 ── -->
+    <div class="bl"></div>
+    <div class="L"><span class="n"></span><span class="c i1"><span class="tag t1">Stage 1</span> <b style="color:var(--s1)">攻击者训练</b>（固定 $\pi_D$）</span></div>
+    <div class="sep"></div>
+
+    <div class="L"><span class="n">5</span><span class="c i1"><span class="kw">for</span> $t = 1$ <span class="kw">to</span> $T$ <span class="kw">do</span></span></div>
+    <div class="L"><span class="n">6</span><span class="c i2">采样种子 batch $\{q_i\}_{i=1}^{B_{\text{train}}} \sim \mathcal{D}_{\text{RL}}$</span></div>
+    <div class="L"><span class="n">7</span><span class="c i2"><span class="kw">for each</span> seed $q_i$ <span class="kw">do</span></span></div>
+
+    <div class="L"><span class="n">8</span><span class="c i3">攻击者生成 $G$ 个 rollout：$\{x_i^{(g)}\}_{g=1}^G \sim \pi_A(\cdot \mid q_i,\, \mathcal{B})$</span></div>
+    <div class="L"><span class="n"></span><span class="c i3"><span class="cm">// 攻击者推理选择策略 $(s,c)$ 并改写 prompt</span></span></div>
+    <div class="L"><span class="n">9</span><span class="c i3">防御者生成单条响应：$y_i^{(g)} \sim \pi_D(\cdot \mid x_i^{(g)})$</span></div>
+    <div class="L"><span class="n">10</span><span class="c i3">评估行为描述符：$b(x_i^{(g)}) \leftarrow RE(x_i^{(g)})$ <span class="cm">// 从攻击者回复中正则提取</span></span></div>
+    <div class="L"><span class="n">11</span><span class="c i3">判定攻击成败：$\text{succ}_i^{(g)} \leftarrow J(y_i^{(g)}) = \texttt{harmful}$</span></div>
+
+    <div class="bl"></div>
+    <div class="L"><span class="n"></span><span class="c i3"><span class="cm">// ── 攻击者奖励 ──</span></span></div>
+    <div class="L"><span class="n">12</span><span class="c i3">$r_{\text{harm}} \leftarrow R_{\text{harm}}(y_i^{(g)})$，$r_{\text{ref}} \leftarrow R_{\text{ref}}(y_i^{(g)})$</span></div>
+    <div class="L"><span class="n">13</span><span class="c i3">$r_{\text{fmt}} \leftarrow R_{\text{fmt}}(x_i^{(g)})$</span></div>
+    <div class="L"><span class="n">14</span><span class="c i3">$\Delta_{\max} \leftarrow \max_{b \in \mathcal{B}}[H(\mathbf{p}_{\mathcal{A} \cup \{x_b\}}) - H(\mathbf{p}_{\mathcal{A}})]$ <span class="cm">// 单步最优熵增（batch 共享）</span></span></div>
+    <div class="L"><span class="n">15</span><span class="c i3">$r_{\text{div}} \leftarrow [H(\mathbf{p}_{\mathcal{A} \cup \{x_i^{(g)}\}}) - H(\mathbf{p}_{\mathcal{A}})] \;/\; (\Delta_{\max} + \epsilon)$</span></div>
+    <div class="L"><span class="n">16</span><span class="c i3">$\lambda \leftarrow$ <span class="kw">if</span> $\text{succ}$ <span class="kw">then</span> $1.0$ <span class="kw">else</span> $0.5$ <span class="cm">// 差异化多样性系数</span></span></div>
+    <div class="L"><span class="n">17</span><span class="c i3">$R_A^{(g)} \leftarrow (-r_{\text{harm}} - r_{\text{ref}}) + r_{\text{fmt}} + \lambda \cdot r_{\text{div}}$</span></div>
+
+    <div class="bl"></div>
+    <div class="L"><span class="n">18</span><span class="c i2">$\pi_A \leftarrow$ <span class="fn">GRPO-Update</span>$(\pi_A,\; \{R_A^{(g)}\})$</span></div>
+
+    <div class="bl"></div>
+    <div class="L"><span class="n"></span><span class="c i1"><span class="cm">// ── Stage 1 结束：攻击成功样本入池 ──</span></span></div>
+    <div class="L"><span class="n">19</span><span class="c i1"><span class="kw">for each</span> 本阶段攻击成功样本 $x$ <span class="kw">do</span></span></div>
+    <div class="L"><span class="n">20</span><span class="c i2"><span class="kw">if</span> $x \notin \mathcal{A}$ <span class="kw">then</span> $\mathcal{A} \leftarrow \mathcal{A} \cup \{(x,\, b(x),\, s\!=\!1,\, f\!=\!0)\}$</span></div>
+    <div class="L"><span class="n">21</span><span class="c i2"><span class="kw">else</span> $s_x \leftarrow s_x + 1$ <span class="cm">// 已存在则累加成功计数</span></span></div>
+
+    <!-- ── Stage 2 ── -->
+    <div class="bl"></div>
+    <div class="L"><span class="n"></span><span class="c i1"><span class="tag t2">Stage 2</span> <b style="color:var(--s2)">防御者训练</b>（固定 $\pi_A$，新攻击 + 回放混合 batch）</span></div>
+    <div class="sep"></div>
+
+    <div class="L"><span class="n">22</span><span class="c i1"><span class="kw">for</span> $t = 1$ <span class="kw">to</span> $T$ <span class="kw">do</span></span></div>
+
+    <div class="bl"></div>
+    <div class="L"><span class="n"></span><span class="c i2"><span class="cm">// ── 新攻击部分：$B_{\text{train}}$ 个样本 ──</span></span></div>
+    <div class="L"><span class="n">23</span><span class="c i2">采样种子 batch $\{q_i\}_{i=1}^{B_{\text{train}}} \sim \mathcal{D}_{\text{RL}}$</span></div>
+    <div class="L"><span class="n">24</span><span class="c i2"><span class="kw">for each</span> seed $q_i$ <span class="kw">do</span></span></div>
+    <div class="L"><span class="n">25</span><span class="c i3">攻击者生成单条攻击：$x_i \sim \pi_A(\cdot \mid q_i,\, \mathcal{B})$</span></div>
+    <div class="L"><span class="n">26</span><span class="c i3">防御者生成 $G$ 个 rollout：$\{y_i^{(g)}\}_{g=1}^G \sim \pi_D(\cdot \mid x_i)$</span></div>
+    <div class="L"><span class="n">27</span><span class="c i3">$R_{D,\text{new}}^{(g)} \leftarrow R_{\text{harm}}(y_i^{(g)}) + R_{\text{ref}}(y_i^{(g)})$</span></div>
+
+    <div class="bl"></div>
+    <div class="L"><span class="n"></span><span class="c i2"><span class="cm">// ── 回放部分：仅当档案池足够时执行 ──</span></span></div>
+    <div class="L"><span class="n">28</span><span class="c i2"><span class="kw">if</span> $|\mathcal{A}| \geq B_{\text{replay}}$ <span class="kw">then</span></span></div>
+    <div class="L"><span class="n">29</span><span class="c i3"><span class="kw">for each</span> $x_j \in \mathcal{A}$ <span class="kw">do</span> $\tilde{p}_j \sim \text{Beta}(\alpha + s_j,\, \beta + f_j)$ <span class="cm">// 采样风险分数</span></span></div>
+    <div class="L"><span class="n">30</span><span class="c i3">$\mathcal{D}_{\text{replay}} \leftarrow \text{Top-}B_{\text{replay}}\bigl(\{\tilde{p}_j\}\bigr)$ <span class="cm">// 取采样值最高的 $B_{\text{replay}}$ 个样本</span></span></div>
+
+    <div class="bl"></div>
+    <div class="L"><span class="n">31</span><span class="c i3"><span class="kw">for each</span> $x_j \in \mathcal{D}_{\text{replay}}$ <span class="kw">do</span></span></div>
+    <div class="L"><span class="n">32</span><span class="c i3">&emsp;防御者生成 $G$ 个 rollout：$\{y_j^{(g)}\}_{g=1}^G \sim \pi_D(\cdot \mid x_j)$</span></div>
+    <div class="L"><span class="n">33</span><span class="c i3">&emsp;$R_{D,\text{replay}}^{(g)} \leftarrow R_{\text{harm}}(y_j^{(g)}) + R_{\text{ref}}(y_j^{(g)})$</span></div>
+
+    <div class="bl"></div>
+    <div class="L"><span class="n"></span><span class="c i3"><span class="cm">&emsp;// 贝叶斯后验更新</span></span></div>
+    <div class="L"><span class="n">34</span><span class="c i3">&emsp;<span class="kw">if</span> $\exists\, g:\; J(y_j^{(g)}) = \texttt{harmful}$ <span class="kw">then</span> $s_j \leftarrow s_j + 1$ <span class="cm">// 仍被攻破</span></span></div>
+    <div class="L"><span class="n">35</span><span class="c i3">&emsp;<span class="kw">else</span> $f_j \leftarrow f_j + 1$ <span class="cm">// 已防住</span></span></div>
+
+    <div class="bl"></div>
+    <div class="L"><span class="n"></span><span class="c i2"><span class="cm">// ── 更新防御者 ──</span></span></div>
+    <div class="L"><span class="n">36</span><span class="c i2"><span class="kw">if</span> $|\mathcal{A}| \geq B_{\text{replay}}$ <span class="kw">then</span> <span class="cm">// 混合 batch 更新</span></span></div>
+    <div class="L"><span class="n">37</span><span class="c i3">$\pi_D \leftarrow$ <span class="fn">GRPO-Update</span>$\bigl(\pi_D,\; \{R_{D,\text{new}}^{(g)}\} \cup \{R_{D,\text{replay}}^{(g)}\}\bigr)$ <span class="cm">// 有效 batch = $B_{\text{train}} + B_{\text{replay}}$</span></span></div>
+    <div class="L"><span class="n">38</span><span class="c i2"><span class="kw">else</span> <span class="cm">// 池不足，仅用新攻击更新</span></span></div>
+    <div class="L"><span class="n">39</span><span class="c i3">$\pi_D \leftarrow$ <span class="fn">GRPO-Update</span>$\bigl(\pi_D,\; \{R_{D,\text{new}}^{(g)}\}\bigr)$ <span class="cm">// 有效 batch = $B_{\text{train}}$</span></span></div>
+
+    <div class="bl"></div>
+    <div class="L"><span class="n"></span><span class="c i2"><span class="cm">// ── 每 batch 后更新回放样本后验均值并剪枝 ──</span></span></div>
+    <div class="L"><span class="n">40</span><span class="c i2"><span class="kw">if</span> $|\mathcal{A}| \geq B_{\text{replay}}$ <span class="kw">then</span></span></div>
+    <div class="L"><span class="n">41</span><span class="c i3"><span class="kw">for each</span> $x_j \in \mathcal{D}_{\text{replay}}$: 更新 $\hat{p}_j \leftarrow (\alpha + s_j) \;/\; (\alpha + s_j + \beta + f_j)$</span></div>
+    <div class="L"><span class="n">42</span><span class="c i3"><span class="kw">for each</span> $x_j \in \mathcal{D}_{\text{replay}}$: <span class="kw">if</span> $\hat{p}_j < \epsilon$ <span class="kw">and</span> $(s_j\!+\!f_j) > n_{\min}$ <span class="kw">then</span> $\mathcal{A} \leftarrow \mathcal{A} \setminus \{x_j\}$</span></div>
+
+    <div class="bl"></div>
+    <div class="L"><span class="n"></span><span class="c i1"><span class="cm">// ── Stage 2 结束：新攻击成功样本入池 ──</span></span></div>
+    <div class="L"><span class="n">43</span><span class="c i1"><span class="kw">for each</span> 本阶段新攻击成功样本 $x$（$\exists\, g:\; J(y^{(g)}) = \texttt{harmful}$）<span class="kw">do</span></span></div>
+    <div class="L"><span class="n">44</span><span class="c i2"><span class="kw">if</span> $x \notin \mathcal{A}$ <span class="kw">then</span> $\mathcal{A} \leftarrow \mathcal{A} \cup \{(x,\, b(x),\, s\!=\!1,\, f\!=\!0)\}$</span></div>
+    <div class="L"><span class="n">45</span><span class="c i2"><span class="kw">else</span> $s_x \leftarrow s_x + 1$</span></div>
+
+    <div class="bl"></div>
+    <div class="L"><span class="n">46</span><span class="c"><span class="kw">Return</span> $\pi_A,\; \pi_D$</span></div>
+
+  </div>
+</div>
+
+<!-- ═══ Diff Summary ═══ -->
+<div class="note">
+  <b>与 MAGIC 的关键差异：</b><br>
+  ① <b>训练顺序</b>：MAGIC 为 Defender → Attacker（防御者先手），本方法改为 <b>Attacker → Defender</b>（攻击者先手）。<br>
+  ② <b>攻击多样性</b>：新增显式二维策略空间 $\mathcal{B} = \mathcal{S} \times \mathcal{C}$ 引导 + 归一化边际覆盖增益（Coverage）作为多样性奖励。攻击者奖励 $R_A = -R_D + R_{\text{fmt}} + \lambda \cdot R_{\text{div}}$，其中 $-R_D$ 保持零和结构。<br>
+  ③ <b>两阶段混合训练</b>：Stage 1 为攻击者 RL 训练（batch size $B_{\text{train}}$）；Stage 2 为防御者混合训练，当档案池满足 $|\mathcal{A}| \geq B_{\text{replay}}$ 时，每个 batch 由 $B_{\text{train}}$ 个新攻击 + $B_{\text{replay}}$ 个回放样本组成（有效 batch = $B_{\text{train}} + B_{\text{replay}}$）；池不足时仅使用新攻击训练。<br>
+  ④ <b>统一攻击档案池</b>：将 Archive 与回放池合并为统一的 $\mathcal{A}$，同时承担策略频次记录（多样性奖励）与贝叶斯回放（防御者补训）两项功能。每个 batch 后更新回放样本的后验均值并即时剪枝。
+</div>
+
+<script>
+  renderMathInElement(document.body,{
+    delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}],
+    throwOnError:false
+  });
+</script>
+</body>
+</html>
