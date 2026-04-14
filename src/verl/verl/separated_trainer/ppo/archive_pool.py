@@ -97,9 +97,9 @@ class ArchivePool:
         self.slot_counts: np.ndarray = np.zeros((N_RISK, N_STYLE), dtype=np.float64)
 
         # Config
-        self.gamma_decay: float = float(config.get('gamma_decay', 0.97))
-        self.prune_threshold: float = float(config.get('prune_threshold', 0.05))
-        self.prune_min_trials: float = float(config.get('prune_min_trials', 5.0))
+        self.gamma_decay: float = float(config.get('gamma_decay', 0.90))
+        self.prune_threshold: float = float(config.get('prune_threshold', 0.20))
+        self.prune_min_trials: float = float(config.get('prune_min_trials', 3.0))
         self.max_pool_size: int = int(config.get('max_pool_size', 5000))
         self.alpha_prior: float = float(config.get('alpha_prior', 1.0))
         self.beta_prior: float = float(config.get('beta_prior', 1.0))

@@ -248,9 +248,9 @@ algorithm:
   replay_pool:
     enable: false
     replay_batch_size: 32       # B_replay per defender step
-    gamma_decay: 0.97           # time decay factor per round
-    prune_threshold: 0.05       # epsilon: prune if posterior mean < this
-    prune_min_trials: 5.0       # n_min: minimum trials before pruning
+    gamma_decay: 0.90           # time decay factor per round
+    prune_threshold: 0.20       # epsilon: prune if posterior mean < this
+    prune_min_trials: 3.0       # n_min: minimum trials before pruning
     max_pool_size: 5000         # max entries in archive
     alpha_prior: 1.0            # Beta prior alpha
     beta_prior: 1.0             # Beta prior beta
