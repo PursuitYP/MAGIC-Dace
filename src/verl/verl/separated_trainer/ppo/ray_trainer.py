@@ -1716,7 +1716,7 @@ class RayReMASeparatedTrainer(object):
 
         # Build batch_dict matching dataloader output format
         batch_dict = defaultdict(list)
-        for entry in entries:
+        for i, entry in enumerate(entries):
             pd = entry.prompt_data
             for key in ['question', 'data_source', 'data_type', 'prompt',
                          'reward_model', 'extra_info', 'ability', 'seed_prompt',
@@ -1724,6 +1724,8 @@ class RayReMASeparatedTrainer(object):
                 batch_dict[key].append(pd.get(key))
             # Set 'adversarial' to the archived attacker prompt text for injection
             batch_dict['adversarial'].append(entry.prompt_text)
+            # Add 'index' field required by generate()
+            batch_dict['index'].append(i)
 
         import torch as _torch
         for key in batch_dict:
@@ -2080,6 +2082,23 @@ class RayReMASeparatedTrainer(object):
                         with _timer('replay', timing_raw):
                             replay_processed = self._run_replay_pipeline(base_rollout_meta_info, metrics)
                             if replay_processed is not None:
+                                ### dace: align batch and non_tensor_batch keys before concat ###
+                                # non_tensor_batch: keep only common keys
+                                common_nt_keys = set(new_batch.non_tensor_batch.keys()) & set(replay_processed.non_tensor_batch.keys())
+                                for key in list(new_batch.non_tensor_batch.keys()):
+                                    if key not in common_nt_keys:
+                                        del new_batch.non_tensor_batch[key]
+                                for key in list(replay_processed.non_tensor_batch.keys()):
+                                    if key not in common_nt_keys:
+                                        del replay_processed.non_tensor_batch[key]
+                                # TensorDict: keep only common keys
+                                if new_batch.batch is not None and replay_processed.batch is not None:
+                                    nb_keys = set(new_batch.batch.keys())
+                                    rp_keys = set(replay_processed.batch.keys())
+                                    for key in nb_keys - rp_keys:
+                                        del new_batch.batch[key]
+                                    for key in rp_keys - nb_keys:
+                                        del replay_processed.batch[key]
                                 new_batch = DataProto.concat([new_batch, replay_processed])
                                 print(f"[DACE] Merged replay batch, total batch size = {len(new_batch)}")
 

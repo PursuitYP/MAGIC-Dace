@@ -17,6 +17,24 @@ from typing import Dict, List, Optional, Set, Tuple
 import numpy as np
 
 
+### dace: numpy-safe JSON encoder for checkpoint serialization ###
+class _NumpyEncoder(json.JSONEncoder):
+    """JSON encoder that handles numpy types transparently."""
+
+    def default(self, obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        if isinstance(obj, np.integer):
+            return int(obj)
+        if isinstance(obj, np.floating):
+            return float(obj)
+        if isinstance(obj, np.bool_):
+            return bool(obj)
+        if isinstance(obj, (np.str_, np.bytes_)):
+            return str(obj)
+        return super().default(obj)
+
+
 @dataclass
 class ArchiveEntry:
     """Single entry in the unified archive / replay pool."""
@@ -353,7 +371,7 @@ class ArchivePool:
             ],
         }
         with open(path, 'w', encoding='utf-8') as f:
-            json.dump(data, f, ensure_ascii=False, indent=2)
+            json.dump(data, f, ensure_ascii=False, indent=2, cls=_NumpyEncoder)
         print(f"[ArchivePool] Saved {len(self.entries)} entries to {path}")
 
     @classmethod
