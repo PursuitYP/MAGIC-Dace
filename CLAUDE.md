@@ -99,6 +99,10 @@ def compute_defender_reward(responses, turn_count):
     ...
 ```
 
+## Editing Guidelines
+
+Always read and fully understand existing code before making any modifications. Never skip the exploration step — thoroughly examine the relevant files, their dependencies, and surrounding context first, then propose changes. This ensures edits are consistent with the existing codebase and avoids introducing unintended side effects.
+
 ## Data Format
 
 Training data uses Parquet format. Each example has fields: `data_source`, `prompt` (chat format), `ability`, `question`, `data_type` (vanilla_harmful/vanilla_benign), `adversarial`, `extra_info`. Data stored in `data/safety/`.
