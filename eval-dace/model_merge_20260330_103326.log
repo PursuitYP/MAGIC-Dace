@@ -1,0 +1,38 @@
+========================================
+模型分片合并脚本启动
+时间: Mon 30 Mar 2026 10:33:26 AM HKT
+实验目录: D-q257bi-A-q257bi-2026-03-29_14-00-52
+要合并的steps: 165 195
+合并档位: 7b (mode=standard, max_workers=default, max_shard_size=default)
+========================================
+---
+开始合并 global_step_165
+时间: Mon 30 Mar 2026 10:33:26 AM HKT
+  合并 attacker...
+  检测到已存在的huggingface目录，检查权限...
+usage: model_merger.py [-h] --local_dir LOCAL_DIR
+                       [--hf_upload_path HF_UPLOAD_PATH]
+model_merger.py: error: unrecognized arguments: --merge-mode standard
+  ✗ attacker合并失败
+  合并 defender...
+  检测到已存在的huggingface目录，检查权限...
+---
+开始合并 global_step_195
+时间: Mon 30 Mar 2026 10:33:36 AM HKT
+  合并 attacker...
+  检测到已存在的huggingface目录，检查权限...
+usage: model_merger.py [-h] --local_dir LOCAL_DIR
+                       [--hf_upload_path HF_UPLOAD_PATH]
+model_merger.py: error: unrecognized arguments: --merge-mode standard
+  ✗ attacker合并失败
+  合并 defender...
+  检测到已存在的huggingface目录，检查权限...
+
+========================================
+合并完成统计
+总steps数: 2
+成功: 2
+失败: 0
+完成时间: Mon 30 Mar 2026 10:33:42 AM HKT
+日志文件: model_merge_20260330_103326.log
+========================================

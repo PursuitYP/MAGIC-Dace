@@ -1,0 +1,54 @@
+========================================
+模型分片合并脚本启动
+时间: Mon 30 Mar 2026 10:42:48 AM HKT
+实验目录: D-q257bi-A-q257bi-2026-03-29_14-00-52
+要合并的steps: 165 195
+合并档位: 7b (当前 model_merger.py 不支持额外 merge 参数)
+========================================
+---
+开始合并 global_step_165
+时间: Mon 30 Mar 2026 10:42:48 AM HKT
+  合并 attacker...
+  检测到已存在的huggingface目录，检查权限...
+`torch_dtype` is deprecated! Use `dtype` instead!
+Got device mesh tensor([0, 1], dtype=torch.int32), mesh_dim_names ('fsdp',)
+Processing model shards with 2 (2,) in total
+Writing to local disk
+Saving model to /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/wenxiaoyu/game/checkpoints/Game-separated/D-q257bi-A-q257bi-2026-03-29_14-00-52/global_step_165/attacker/actor/huggingface
+  ✓ attacker 合并成功
+  合并 defender...
+  检测到已存在的huggingface目录，检查权限...
+`torch_dtype` is deprecated! Use `dtype` instead!
+Got device mesh tensor([0, 1], dtype=torch.int32), mesh_dim_names ('fsdp',)
+Processing model shards with 2 (2,) in total
+Writing to local disk
+Saving model to /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/wenxiaoyu/game/checkpoints/Game-separated/D-q257bi-A-q257bi-2026-03-29_14-00-52/global_step_165/defender/actor/huggingface
+  ✓ defender 合并成功
+---
+开始合并 global_step_195
+时间: Mon 30 Mar 2026 10:43:59 AM HKT
+  合并 attacker...
+  检测到已存在的huggingface目录，检查权限...
+`torch_dtype` is deprecated! Use `dtype` instead!
+Got device mesh tensor([0, 1], dtype=torch.int32), mesh_dim_names ('fsdp',)
+Processing model shards with 2 (2,) in total
+Writing to local disk
+Saving model to /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/wenxiaoyu/game/checkpoints/Game-separated/D-q257bi-A-q257bi-2026-03-29_14-00-52/global_step_195/attacker/actor/huggingface
+  ✓ attacker 合并成功
+  合并 defender...
+  检测到已存在的huggingface目录，检查权限...
+`torch_dtype` is deprecated! Use `dtype` instead!
+Got device mesh tensor([0, 1], dtype=torch.int32), mesh_dim_names ('fsdp',)
+Processing model shards with 2 (2,) in total
+Writing to local disk
+Saving model to /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/wenxiaoyu/game/checkpoints/Game-separated/D-q257bi-A-q257bi-2026-03-29_14-00-52/global_step_195/defender/actor/huggingface
+  ✓ defender 合并成功
+
+========================================
+合并完成统计
+总steps数: 2
+成功: 2
+失败: 0
+完成时间: Mon 30 Mar 2026 10:45:10 AM HKT
+日志文件: model_merge_20260330_104248.log
+========================================

@@ -1,0 +1,11 @@
+*__pycache__*
+generation_results
+safety_eval.egg-info
+results
+*.sh 
+!run_classification.sh
+diversity_analysis/
+diversity_analysis_new/
+logs/
+SFT_generate/
+extract_jsonl.py

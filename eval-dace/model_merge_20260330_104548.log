@@ -1,0 +1,47 @@
+========================================
+模型分片合并脚本启动
+时间: Mon 30 Mar 2026 10:45:48 AM HKT
+实验目录: D-q257bi-A-q257bi-2026-03-29_14-00-52
+要合并的steps: 165 195
+合并档位: 7b (当前 model_merger.py 不支持额外 merge 参数)
+========================================
+---
+开始合并 global_step_165
+时间: Mon 30 Mar 2026 10:45:48 AM HKT
+  合并 attacker...
+  检测到已存在的huggingface目录，检查权限...
+Traceback (most recent call last):
+  File "/mnt/shared-storage-user/wenxiaoyu/game-private/src/verl/scripts/model_merger.py", line 20, in <module>
+    from transformers import AutoConfig, AutoModelForCausalLM, AutoModelForTokenClassification, AutoModelForVision2Seq
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/site-packages/transformers/__init__.py", line 27, in <module>
+    from . import dependency_versions_check
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/site-packages/transformers/dependency_versions_check.py", line 16, in <module>
+    from .utils.versions import require_version, require_version_core
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/site-packages/transformers/utils/__init__.py", line 19, in <module>
+    from huggingface_hub import get_full_repo_name  # for backward compatibility
+  File "<frozen importlib._bootstrap>", line 1075, in _handle_fromlist
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/site-packages/huggingface_hub/__init__.py", line 1044, in __getattr__
+    submod = importlib.import_module(submod_path)
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/importlib/__init__.py", line 126, in import_module
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/site-packages/huggingface_hub/hf_api.py", line 56, in <module>
+    from ._commit_api import (
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/site-packages/huggingface_hub/_commit_api.py", line 20, in <module>
+    from .file_download import hf_hub_url
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/site-packages/huggingface_hub/file_download.py", line 22, in <module>
+    from ._local_folder import get_local_download_paths, read_download_metadata, write_download_metadata
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/site-packages/huggingface_hub/_local_folder.py", line 61, in <module>
+    from .utils import WeakFileLock
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/site-packages/huggingface_hub/utils/__init__.py", line 39, in <module>
+    from ._cache_manager import (
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/site-packages/huggingface_hub/utils/_cache_manager.py", line 105, in <module>
+    class CachedRevisionInfo:
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/dataclasses.py", line 1175, in wrap
+    return _process_class(cls, init, repr, eq, order, unsafe_hash,
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/dataclasses.py", line 1053, in _process_class
+    _cmp_fn('__eq__', '==',
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/dataclasses.py", line 629, in _cmp_fn
+    return _create_fn(name,
+  File "/home/hezhida/.conda/envs/safety-eval/lib/python3.10/dataclasses.py", line 432, in _create_fn
+    exec(txt, globals, ns)
+  File "<string>", line 1, in <module>
+KeyboardInterrupt

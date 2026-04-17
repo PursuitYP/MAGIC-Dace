@@ -1,0 +1,6 @@
+{
+  "total_records_extracted": 3840,
+  "processed_steps": 15,
+  "max_steps_processed": 300,
+  "output_directory": "/mnt/shared-storage-user/wenxiaoyu/game-private/eval/pattern/raw_json/v3-D-q257bi-A-sftv4-balanced-8192-reward1_0.5_0.5-woDformat-ratio11-freq15-add_label_reward-revised_label-2026-01-04_14-57-50"
+}
