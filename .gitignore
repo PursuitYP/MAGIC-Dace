@@ -1,5 +1,44 @@
+# environment / run artifacts
 outputs/
 logs/
 wandb/
 checkpoints/
 flash_attn-2.7.4.post1+cu12torch2.6cxx11abiFALSE-cp310-cp310-linux_x86_64.whl
+
+# SFT distill intermediate outputs
+data-sft/sft_data_cot_benign.jsonl
+data-sft/sft_data_cot_harmful.jsonl
+data-sft/sft_data_cot_benign_tmp.jsonl
+data-sft/sft_data_cot_harmful_tmp.jsonl
+data-sft/*.jsonl.err
+
+# Large training data (fetch externally; do not track)
+data-sft/vanilla_harmful_dataset_origin.jsonl
+data-sft/vanilla_benign_8b_T_0.6_topp_0.9_wgclean_postfill_cot_15000.jsonl
+data-sft/helpsteer3_8b_T_0.6_topp_0.9_wgclean_postfill_cot_15000.jsonl
+data/sft/game_cot_benign.json
+data/sft/game_cot_harmful.json
+data/sft/game_cot_harmful_wocode.json
+src/360-LLaMA-Factory/data/game_cot_benign.json
+src/360-LLaMA-Factory/data/game_cot_harmful.json
+src/360-LLaMA-Factory/data/game_cot_harmful_wocode.json
+data/safety/train.parquet
+data/safety/train_dace.parquet
+data/safety/vanilla_benign_dataset.jsonl
+data/safety/vanilla_harmful_dataset.jsonl
+data/safety/vanilla_harmful_dataset_origin.jsonl
+data/train_step_1.jsonl
+
+# AlpacaEval cached annotations (large, fetchable)
+eval-dace/safety-eval-fork/evaluation/tasks/generation/alpacaeval/alpaca_eval_all_outputs.json
+eval-dace/safety-eval-fork/evaluation/tasks/generation/alpacaeval/alpaca_eval_annotations_alpaca_eval_gpt4.json
+eval-dace/safety-eval-fork/evaluation/tasks/generation/alpacaeval/alpaca_eval_annotations_claude.json
+eval-dace/safety-eval-fork/evaluation/tasks/generation/alpacaeval/alpaca_farm_human_annotations.json
+eval-dace/safety-eval-fork/evaluation/tasks/generation/alpacaeval/cache/alpaca_eval_annotator_cache.json
+
+# Externally cloned eval repos and datasets (not subprojects of this repo)
+eval-dace/AISafetyLab/
+eval-dace/OpenRT/
+eval-dace/safety-eval-fork/evaluation/tasks/generation/codex_eval/humanevalpack/
+eval-dace/safety-eval-fork/evaluation/tasks/generation/or_bench/strongreject/
+eval-dace/safety-eval-fork/evaluation/tasks/generation/x-teaming/
