@@ -2,5 +2,5 @@
 generation_results
 safety_eval.egg-info
 results
-*.sh 
+# *.sh 
 run_unified_eval.sh

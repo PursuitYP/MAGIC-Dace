@@ -53,7 +53,7 @@ site/
 
 *json
 eval
-*.sh
+# *.sh
 result/
 results/
 api_eval.py
