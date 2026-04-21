@@ -116,12 +116,14 @@ class ArchivePool:
 
         # Config
         self.gamma_decay: float = float(config.get('gamma_decay', 0.90))
-        self.prune_threshold: float = float(config.get('prune_threshold', 0.20))
-        self.prune_min_trials: float = float(config.get('prune_min_trials', 3.0))
-        self.max_pool_size: int = int(config.get('max_pool_size', 5000))
+        self.prune_threshold: float = float(config.get('prune_threshold', 0.35))
+        self.prune_min_trials: float = float(config.get('prune_min_trials', 2.0))
+        self.max_pool_size: int = int(config.get('max_pool_size', 2000))
         self.alpha_prior: float = float(config.get('alpha_prior', 1.0))
         self.beta_prior: float = float(config.get('beta_prior', 1.0))
         self.epsilon: float = float(config.get('epsilon', 1e-8))
+        ### dace: clip negative diversity reward (avoid late-stage sign flip degradation) ###
+        self.clip_negative: bool = bool(config.get('clip_negative', True))
 
         # Cache for diversity reward denominator
         self._cached_max_delta: Optional[float] = None
@@ -214,7 +216,11 @@ class ArchivePool:
         """
         delta = self._compute_marginal_entropy_gain(strategy)
         delta_max = self._compute_max_marginal_gain()
-        return delta / (delta_max + self.epsilon)
+        r_div = delta / (delta_max + self.epsilon)
+        ### dace: clip negative diversity reward to 0 to avoid late-stage degradation ###
+        if self.clip_negative:
+            return max(0.0, r_div)
+        return r_div
 
     def _invalidate_cache(self):
         self._cached_max_delta = None

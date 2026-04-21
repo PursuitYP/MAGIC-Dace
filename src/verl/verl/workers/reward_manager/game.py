@@ -182,6 +182,9 @@ class GameRewardManager:
         role_format_rewards = {
             role: torch.zeros(batch_size, dtype=torch.float32) for role in agent_roles
         }
+        ### dace: track which samples had attacker generation skipped (replay samples) ###
+        # Used downstream to compute masked mean of attacker format reward
+        attacker_gen_skipped_mask = torch.zeros(batch_size, dtype=torch.float32)
         
         already_print_data_sources = {}
 
@@ -334,6 +337,10 @@ class GameRewardManager:
                 data_item.meta_info.get('format_reward_roles'),
                 train_roles,
             )
+            ### dace: detect whether attacker generation was skipped (replay sample) ###
+            attacker_last_msg = _get_last_role_message(valid_history, 'attacker')
+            if attacker_last_msg is not None and attacker_last_msg.get('attacker_gen_skipped'):
+                attacker_gen_skipped_mask[i_bsz] = 1.0
             for role in agent_roles:
                 turn_finished = data_item.batch[f'{role}_turn_finished'].item()
                 if role == 'attacker':
@@ -347,13 +354,18 @@ class GameRewardManager:
                         and role in train_roles and role in format_reward_roles):
                     last_role_msg = _get_last_role_message(valid_history, role)
                     if last_role_msg is not None:
-                        ### dace: pass use_dace_format for 3-tag format reward ###
-                        use_dace_format = data_item.meta_info.get('use_dace_format', False)
-                        format_r = compute_format_r(data_source, role, last_role_msg['content'],
-                                                    use_dace_format=use_dace_format)
-                        role_score += format_r
-                        format_bonus += format_r
-                        role_format_rewards[role][i_bsz] = format_r
+                        ### dace: skip format reward for replay samples where attacker was gen-skipped ###
+                        # (archived prompt_text doesn't have tags → would give -1 reward and pollute metric)
+                        if role == 'attacker' and last_role_msg.get('attacker_gen_skipped'):
+                            pass  # skip format computation; role_format_rewards stays 0 (mask handled at metric level)
+                        else:
+                            ### dace: pass use_dace_format for 3-tag format reward ###
+                            use_dace_format = data_item.meta_info.get('use_dace_format', False)
+                            format_r = compute_format_r(data_source, role, last_role_msg['content'],
+                                                        use_dace_format=use_dace_format)
+                            role_score += format_r
+                            format_bonus += format_r
+                            role_format_rewards[role][i_bsz] = format_r
                         # if role == 'attacker':
                         #     role_score += revision_reward_func(attacker_prompt, sample_extra)
 
@@ -377,5 +389,7 @@ class GameRewardManager:
         reward_tensor_map['format_reward'] = format_rewards
         for role in agent_roles:
             reward_tensor_map[f'{role}_format_reward'] = role_format_rewards[role]
+        ### dace: export attacker_gen_skipped mask for metric filtering ###
+        reward_tensor_map['attacker_gen_skipped_mask'] = attacker_gen_skipped_mask
         # Return both reward tensors in a dictionary
         return reward_tensor_map

@@ -158,7 +158,7 @@ PYTHONUNBUFFERED=1 python -m verl.separated_trainer.main_ppo \
     algorithm.switch_agent.model_paths=[${QWEN_257BI_MODEL_PATH},${QWEN_257BI_MODEL_PATH}] \
     algorithm.switch_agent.agent_roles=[attacker,defender] \
     algorithm.switch_agent.train_roles=[attacker,defender] \
-    algorithm.switch_agent.start_agent=attacker \
+    algorithm.switch_agent.start_agent=defender \
     "${SWITCH_ARGS[@]}" \
     reward_model.reward_manager=game \
     reward_model.mask_unfinished_reward=True \
@@ -174,11 +174,12 @@ PYTHONUNBUFFERED=1 python -m verl.separated_trainer.main_ppo \
     algorithm.replay_pool.enable=True \
     algorithm.replay_pool.replay_batch_size=32 \
     algorithm.replay_pool.gamma_decay=0.90 \
-    algorithm.replay_pool.prune_threshold=0.20 \
-    algorithm.replay_pool.prune_min_trials=3.0 \
-    algorithm.replay_pool.max_pool_size=5000 \
+    algorithm.replay_pool.prune_threshold=0.35 \
+    algorithm.replay_pool.prune_min_trials=2.0 \
+    algorithm.replay_pool.max_pool_size=2000 \
     algorithm.replay_pool.alpha_prior=1.0 \
     algorithm.replay_pool.beta_prior=1.0 \
+    algorithm.replay_pool.clip_negative=True \
     2>&1 | tee "${PROJECT_DIR}/logs/game/${experiment_name}.log"
 
 ray stop --force

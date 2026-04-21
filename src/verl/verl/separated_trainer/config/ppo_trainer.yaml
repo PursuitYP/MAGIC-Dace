@@ -249,11 +249,12 @@ algorithm:
     enable: false
     replay_batch_size: 32       # B_replay per defender step
     gamma_decay: 0.90           # time decay factor per round
-    prune_threshold: 0.20       # epsilon: prune if posterior mean < this
-    prune_min_trials: 3.0       # n_min: minimum trials before pruning
-    max_pool_size: 5000         # max entries in archive
+    prune_threshold: 0.35       # epsilon: prune if posterior mean < this (raised from 0.20 for zombie handling)
+    prune_min_trials: 2.0       # n_min: minimum trials before pruning (lowered from 3.0)
+    max_pool_size: 2000         # max entries in archive (reduced from 5000 to trigger FIFO earlier)
     alpha_prior: 1.0            # Beta prior alpha
     beta_prior: 1.0             # Beta prior beta
+    clip_negative: true         # clip negative diversity reward to 0
 
 trainer:
   balance_batch: True
