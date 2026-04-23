@@ -35,6 +35,87 @@
       "system": "system"
     }
   },
+  "game_cot_dace_benign": {
+    "file_name": "game_cot_dace_benign.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
+  "game_cot_dace_harmful": {
+    "file_name": "game_cot_dace_harmful.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
+  "game_cot_dace_all": {
+    "file_name": "game_cot_dace_all.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
+  "game_cot_dace_v2_benign": {
+    "file_name": "game_cot_dace_v2_benign.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
+  "game_cot_dace_v2_harmful": {
+    "file_name": "game_cot_dace_v2_harmful.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
+  "game_cot_dace_v2_all": {
+    "file_name": "game_cot_dace_v2_all.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
+  "game_cot_dace_v1nv2_v3_benign": {
+    "file_name": "game_cot_dace_v1nv2_v3_benign.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
+  "game_cot_dace_v1nv2_v3_harmful": {
+    "file_name": "game_cot_dace_v1nv2_v3_harmful.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
+  "game_cot_dace_v1nv2_v3_all": {
+    "file_name": "game_cot_dace_v1nv2_v3_all.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
   "glaive_toolcall_en_demo": {
     "file_name": "glaive_toolcall_en_demo.json",
     "formatting": "sharegpt",
