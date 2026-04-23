@@ -9,7 +9,7 @@ finetuning_type: full
 deepspeed: examples/deepspeed/ds_z2_config.json
 
 ### dataset
-dataset: game_cot_gemini_wocode,game_cot_benign
+dataset: game_cot_dace_harmful,game_cot_dace_benign
 template: qwen
 cutoff_len: 32768
 # max_samples: 1000
@@ -18,9 +18,9 @@ preprocessing_num_workers: 16
 
 ### output
 # output_dir: /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/wenxiaoyu/game_sft/saves/qwen2.5-7BI_cot_w_harm_72b_wocode/full/sft
-output_dir: /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-sft/qwen2.5-7BI_cot_w_harm_wocode-full-sft
+output_dir: /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-sft/qwen2d5-7b_full_sft_dsz2
 logging_steps: 1
-save_steps: 400
+save_steps: 5000
 plot_loss: true
 overwrite_output_dir: true
 
