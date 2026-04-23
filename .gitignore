@@ -11,6 +11,8 @@ data-sft/sft_data_cot_harmful.jsonl
 data-sft/sft_data_cot_benign_tmp.jsonl
 data-sft/sft_data_cot_harmful_tmp.jsonl
 data-sft/*.jsonl.err
+data-sft/*.jsonl
+data-sft/*.json
 
 # Large training data (fetch externally; do not track)
 data-sft/vanilla_harmful_dataset_origin.jsonl
@@ -22,6 +24,7 @@ data/sft/game_cot_harmful_wocode.json
 src/360-LLaMA-Factory/data/game_cot_benign.json
 src/360-LLaMA-Factory/data/game_cot_harmful.json
 src/360-LLaMA-Factory/data/game_cot_harmful_wocode.json
+src/360-LLaMA-Factory/data/*.json
 data/safety/train.parquet
 data/safety/train_dace.parquet
 data/safety/vanilla_benign_dataset.jsonl
