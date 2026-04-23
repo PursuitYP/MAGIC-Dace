@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-### dace: idempotent driver that finishes distilling benign+harmful vanilla prompts to CoT JSONL ###
+### dace: idempotent driver that finishes distilling benign+harmful vanilla prompts to CoT JSONL (v2: directed attack-style assignment + anti-leak clean step) ###
 #
 # Usage:
-#   bash data-sft/run_cot_distill.sh               # clean failed rows + run both scripts in parallel
-#   bash data-sft/run_cot_distill.sh --no-clean    # do NOT remove answer=null rows before running
-#   bash data-sft/run_cot_distill.sh --only benign # only run the benign pipeline
-#   bash data-sft/run_cot_distill.sh --only harmful
+#   bash data-sft/run_cot_distill_v2.sh               # clean failed rows + run both scripts in parallel
+#   bash data-sft/run_cot_distill_v2.sh --no-clean    # do NOT remove answer=null / format-bad rows before running
+#   bash data-sft/run_cot_distill_v2.sh --only benign # only run the benign pipeline
+#   bash data-sft/run_cot_distill_v2.sh --only harmful
 #
 # Safe to run repeatedly. Each invocation:
 #   1. (by default) strips records that are unusable for SFT and moves them to a .err file so the Python
@@ -17,13 +17,15 @@
 #        - the <strategy> block cannot be parsed as "risk category: X\nattack style: Y",
 #          or the named risk category / attack style is outside the canonical DACE 14x10 space
 #          (case-insensitive match; words must otherwise be verbatim)
+#        - the parsed attack style does not match the record's assigned_style (directed-style drift)
+#        - the <think> block leaks the assignment (meta-reference regex match)
 #        - the line itself is not valid JSON
 #   2. re-runs both python scripts, which internally dedup + drop 8192-truncated rows for regeneration
 #   3. prints a completion summary
 #
 # Targets:
-#   benign  : sft_data_source_benign.jsonl          (~20000 unique)   -> sft_data_cot_benign.jsonl   (~20000 rows)
-#   harmful : sft_data_source_harmful_dedup.jsonl   (~5794 unique)    -> sft_data_cot_harmful.jsonl  (5794 x NUM_RUNS=4 ~= 23176 rows)
+#   benign  : sft_data_source_benign.jsonl          (~20000 unique)   -> sft_data_cot_v2_benign.jsonl   (~20000 rows)
+#   harmful : sft_data_source_harmful_dedup.jsonl   (~5794 unique)    -> sft_data_cot_v2_harmful.jsonl  (5794 x NUM_RUNS=4 ~= 23176 rows)
 
 set -euo pipefail
 
@@ -54,10 +56,10 @@ if command -v conda >/dev/null 2>&1; then
   conda activate magic
 fi
 
-BENIGN_OUT="data-sft/sft_data_cot_benign.jsonl"
-HARMFUL_OUT="data-sft/sft_data_cot_harmful.jsonl"
+BENIGN_OUT="data-sft/sft_data_cot_v2_benign.jsonl"
+HARMFUL_OUT="data-sft/sft_data_cot_v2_harmful.jsonl"
 
-### dace: strip rows whose answer/output is null, whose raw output violates the <think><strategy><answer> format (mirrors format_reward_func_dace in verl/utils/reward_score/game.py), or whose <strategy> block names a risk category / attack style outside the 14x10 DACE space; dropped rows go to <out>.err so the Python distiller re-requests them next run ###
+### dace: v2 clean step — drops rows that are null / malformed / off-space / style-mismatched / think-leaked; dropped rows go to <out>.err and get re-requested by the Python distiller next run ###
 clean_failed_rows() {
   python - "$BENIGN_OUT" "$HARMFUL_OUT" <<'PY'
 import json, re, sys
@@ -76,7 +78,21 @@ STRATEGY_PATTERN = re.compile(
     re.DOTALL | re.IGNORECASE,
 )
 
-### dace: canonical 14 risk categories and 10 attack styles from the DACE strategy space (see distill_vanilla_*_jsonl.py / data/safety/preprocess_dace.py); case-insensitive match but words must be verbatim ###
+### dace: <think> extractor for anti-leak scan ###
+THINK_PATTERN = re.compile(r"<think>\s*(.*?)\s*</think>", re.DOTALL)
+
+### dace: anti-leak regex — 4 tight patterns that flag meta-references to the directed assignment while avoiding common innocuous phrases like 'required level of formality' or 'selected topic' ###
+LEAK_PATTERNS = re.compile(
+    r"("
+    r"assigned (attack )?style"                                # "the assigned style" / "my assigned attack style"
+    r"|I (was|am) (told|instructed|asked|required) to"         # "I was told to..." first-person meta
+    r"|per (the|this) (instruction|constraint|request|task|specification)"  # "per the instruction"
+    r"|(chosen|selected) for me"                                # "the style chosen for me"
+    r")",
+    re.IGNORECASE,
+)
+
+### dace: canonical 14 risk categories and 10 attack styles from the DACE strategy space (see distill_v2_vanilla_*_jsonl.py / data/safety/preprocess_dace.py); case-insensitive match but words must be verbatim ###
 RISK_CATEGORIES_CANONICAL = [
     "Violent Crimes",
     "Non-Violent Crimes",
@@ -124,23 +140,18 @@ def check_dace_format(text: str) -> bool:
     return DACE_ORDER_PATTERN.search(text) is not None
 
 
-def classify_strategy(text: str) -> str | None:
-    """Return None if the <strategy> block is fully valid; otherwise a reason tag:
-    - 'bad_strategy_parse': <strategy> block missing / not in 'risk category: X\nattack style: Y' form
-    - 'bad_risk'          : parsable but risk category not one of the canonical 14
-    - 'bad_style'         : parsable but attack style not one of the canonical 10
-    Matching is case-insensitive; the captured words must otherwise be verbatim (whitespace-stripped).
-    """
+def parse_strategy(text: str):
+    """Return (risk_cf, style_cf, reason) — reason is None on success, else tag identifying why it failed."""
     m = STRATEGY_PATTERN.search(text or "")
     if not m:
-        return "bad_strategy_parse"
-    risk  = (m.group(1) or "").strip().casefold()
-    style = (m.group(2) or "").strip().casefold()
-    if risk not in RISK_SET:
-        return "bad_risk"
-    if style not in STYLE_SET:
-        return "bad_style"
-    return None
+        return None, None, "bad_strategy_parse"
+    risk_cf  = (m.group(1) or "").strip().casefold()
+    style_cf = (m.group(2) or "").strip().casefold()
+    if risk_cf not in RISK_SET:
+        return risk_cf, style_cf, "bad_risk"
+    if style_cf not in STYLE_SET:
+        return risk_cf, style_cf, "bad_style"
+    return risk_cf, style_cf, None
 
 
 for arg in sys.argv[1:]:
@@ -153,13 +164,15 @@ for arg in sys.argv[1:]:
     stats = {
         "total": 0,
         "ok": 0,
-        "bad_json": 0,             # 整行 JSON 解析失败
-        "null_output": 0,          # BadRequestError 兜底：Gemini 调用失败，output=None/""
-        "null_answer": 0,          # output 非空但抠不出 <answer> → answer=""
-        "bad_format": 0,           # output 不满足 format_reward_func_dace 的三段式
-        "bad_strategy_parse": 0,   # <strategy> 块缺失或非 "risk category: X / attack style: Y" 形式
-        "bad_risk": 0,             # risk category 不在 canonical 14 之内
-        "bad_style": 0,            # attack style 不在 canonical 10 之内
+        "bad_json": 0,               # 整行 JSON 解析失败
+        "null_output": 0,            # BadRequestError 兜底：Gemini 调用失败，output=None/""
+        "null_answer": 0,            # output 非空但抠不出 <answer> → answer=""
+        "bad_format": 0,             # output 不满足 format_reward_func_dace 的三段式
+        "bad_strategy_parse": 0,     # <strategy> 块缺失或非 "risk category: X / attack style: Y" 形式
+        "bad_risk": 0,               # risk category 不在 canonical 14 之内
+        "bad_style": 0,              # attack style 不在 canonical 10 之内
+        "bad_style_mismatch": 0,     # 解析出的 attack style 与 record.assigned_style 不一致（directed-style drift）
+        "bad_think_leak": 0,         # <think> 含 assignment 泄漏短语
     }
 
     for line in p.read_text(encoding="utf-8").splitlines():
@@ -190,9 +203,24 @@ for arg in sys.argv[1:]:
             dropped.append(line)
             continue
 
-        strat_reason = classify_strategy(output)
+        _, parsed_style_cf, strat_reason = parse_strategy(output)
         if strat_reason is not None:
             stats[strat_reason] += 1
+            dropped.append(line)
+            continue
+
+        ### dace: directed-style drift check — attack style must match record.assigned_style (case-insensitive) ###
+        assigned_style_cf = (r.get("assigned_style") or "").strip().casefold()
+        if not assigned_style_cf or parsed_style_cf != assigned_style_cf:
+            stats["bad_style_mismatch"] += 1
+            dropped.append(line)
+            continue
+
+        ### dace: anti-leak — <think> must not reveal that the style was assigned ###
+        think_match = THINK_PATTERN.search(output)
+        think_text = think_match.group(1) if think_match else ""
+        if LEAK_PATTERNS.search(think_text):
+            stats["bad_think_leak"] += 1
             dropped.append(line)
             continue
 
@@ -211,6 +239,7 @@ for arg in sys.argv[1:]:
         f"(null_output={stats['null_output']}, null_answer={stats['null_answer']}, "
         f"bad_format={stats['bad_format']}, bad_strategy_parse={stats['bad_strategy_parse']}, "
         f"bad_risk={stats['bad_risk']}, bad_style={stats['bad_style']}, "
+        f"bad_style_mismatch={stats['bad_style_mismatch']}, bad_think_leak={stats['bad_think_leak']}, "
         f"bad_json={stats['bad_json']}){err_note}"
     )
 PY
@@ -248,13 +277,13 @@ fi
 
 PIDS=()
 if [[ -z "$ONLY" || "$ONLY" == "benign" ]]; then
-  echo "[run] launching benign distillation -> logs/distill_benign.log"
-  python data-sft/distill_vanilla_benign_jsonl.py > logs/distill_benign.log 2>&1 &
+  echo "[run] launching benign distillation (v2) -> logs/distill_v2_benign.log"
+  python data-sft/distill_v2_vanilla_benign_jsonl.py > logs/distill_v2_benign.log 2>&1 &
   PIDS+=($!)
 fi
 if [[ -z "$ONLY" || "$ONLY" == "harmful" ]]; then
-  echo "[run] launching harmful distillation -> logs/distill_harmful.log"
-  python data-sft/distill_vanilla_harmful_jsonl.py > logs/distill_harmful.log 2>&1 &
+  echo "[run] launching harmful distillation (v2) -> logs/distill_v2_harmful.log"
+  python data-sft/distill_v2_vanilla_harmful_jsonl.py > logs/distill_v2_harmful.log 2>&1 &
   PIDS+=($!)
 fi
 

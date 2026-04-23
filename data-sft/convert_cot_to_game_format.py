@@ -164,4 +164,20 @@ python data-sft/convert_cot_to_game_format.py \
     --benign-out  src/360-LLaMA-Factory/data/game_cot_dace_benign.json \
     --harmful-out src/360-LLaMA-Factory/data/game_cot_dace_harmful.json \
     --merged-out  src/360-LLaMA-Factory/data/game_cot_dace_all.json
+
+### dace: v2 (directed attack-style) distillation outputs ###
+python data-sft/convert_cot_to_game_format.py \
+    --benign-src  data-sft/sft_data_cot_v2_benign.jsonl \
+    --harmful-src data-sft/sft_data_cot_v2_harmful.jsonl \
+    --benign-out  data-sft/game_cot_dace_v2_benign.json \
+    --harmful-out data-sft/game_cot_dace_v2_harmful.json \
+    --merged-out  data-sft/game_cot_dace_v2_all.json
+
+### dace: v2 side-by-side (keep v1 outputs for A/B comparison; requires registering game_cot_dace_v2_* in dataset_info.json) ###
+python data-sft/convert_cot_to_game_format.py \
+    --benign-src  data-sft/sft_data_cot_v2_benign.jsonl \
+    --harmful-src data-sft/sft_data_cot_v2_harmful.jsonl \
+    --benign-out  src/360-LLaMA-Factory/data/game_cot_dace_v2_benign.json \
+    --harmful-out src/360-LLaMA-Factory/data/game_cot_dace_v2_harmful.json \
+    --merged-out  src/360-LLaMA-Factory/data/game_cot_dace_v2_all.json
 """
