@@ -1,0 +1,41 @@
+### model
+model_name_or_path: /mnt/shared-storage-user/wenxiaoyu/models/Qwen2.5-7B-Instruct
+# resume_from_checkpoint:
+
+### method
+stage: sft
+do_train: true
+finetuning_type: full
+deepspeed: examples/deepspeed/ds_z2_config.json
+
+### dataset
+dataset: game_cot_dace_v1nv2_v3_harmful,game_cot_dace_v1nv2_v3_benign
+template: qwen
+cutoff_len: 32768
+# max_samples: 1000
+overwrite_cache: true
+preprocessing_num_workers: 16
+
+### output
+# output_dir: /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/wenxiaoyu/game_sft/saves/qwen2.5-7BI_cot_w_harm_72b_wocode/full/sft
+output_dir: /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-sft/qwen2d5-7b_v3_full_sft_dsz2
+logging_steps: 1
+save_steps: 5000
+plot_loss: true
+overwrite_output_dir: true
+
+### train
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 2
+learning_rate: 5.0e-6
+num_train_epochs: 3.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+bf16: true
+ddp_timeout: 180000000
+
+### eval
+val_size: 0.1
+per_device_eval_batch_size: 1
+eval_strategy: steps
+eval_steps: 20
