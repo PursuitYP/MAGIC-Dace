@@ -103,6 +103,8 @@ def compute_defender_reward(responses, turn_count):
 
 Always read and fully understand existing code before making any modifications. Never skip the exploration step — thoroughly examine the relevant files, their dependencies, and surrounding context first, then propose changes. This ensures edits are consistent with the existing codebase and avoids introducing unintended side effects.
 
+Always keep changes minimal and goal-driven. Define a short success criterion for the task first, prefer the simplest implementation that satisfies it, and make only the edits that are directly required. This avoids speculative abstractions, adjacent cleanup, or extra configurability that was not requested, and keeps the change focused and easy to review.
+
 ## Data Format
 
 Training data uses Parquet format. Each example has fields: `data_source`, `prompt` (chat format), `ability`, `question`, `data_type` (vanilla_harmful/vanilla_benign), `adversarial`, `extra_info`. Data stored in `data/safety/`.
