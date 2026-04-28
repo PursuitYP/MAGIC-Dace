@@ -53,7 +53,7 @@ project_name=game
 # experiment_name="D-q257bi-A-q257bisft_wocode-reward1_0.5_0-woDformat-wo_label_reward-revised_label-tp2-${timestamp}"
 # experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-w_magic_sft-${timestamp}"
 # experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-wo_sft-${timestamp}"
-experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft-replay64_${timestamp}"
+experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft-prune0d50_${timestamp}"
 
 # DEFENDER BASE MODEL
 LLAMA_38BI_MODEL_PATH=$WORKSPACE/models/Meta-Llama-3-8B-Instruct/snapshots/8afb486c1db24fe5011ec46dfbe5b5dccdb575c2
@@ -179,7 +179,7 @@ PYTHONUNBUFFERED=1 python -m verl.separated_trainer.main_ppo \
     algorithm.replay_pool.enable=True \
     algorithm.replay_pool.replay_batch_size=32 \
     algorithm.replay_pool.gamma_decay=0.90 \
-    algorithm.replay_pool.prune_threshold=0.45 \
+    algorithm.replay_pool.prune_threshold=0.50 \
     algorithm.replay_pool.prune_min_trials=2.0 \
     algorithm.replay_pool.max_pool_size=4000 \
     algorithm.replay_pool.alpha_prior=1.0 \

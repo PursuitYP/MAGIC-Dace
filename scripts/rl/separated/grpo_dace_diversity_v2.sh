@@ -53,7 +53,7 @@ project_name=game
 # experiment_name="D-q257bi-A-q257bisft_wocode-reward1_0.5_0-woDformat-wo_label_reward-revised_label-tp2-${timestamp}"
 # experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-w_magic_sft-${timestamp}"
 # experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-wo_sft-${timestamp}"
-experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft-${timestamp}"
+experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft-replay64_${timestamp}"
 
 # DEFENDER BASE MODEL
 LLAMA_38BI_MODEL_PATH=$WORKSPACE/models/Meta-Llama-3-8B-Instruct/snapshots/8afb486c1db24fe5011ec46dfbe5b5dccdb575c2
@@ -81,6 +81,7 @@ SFTV6_MODEL_PATH=$PROJECT_DIR/src/360-LLaMA-Factory/saves/qwen2.5-7B-cot_w_harm_
 SFTV7_MODEL_PATH=$PROJECT_DIR/src/360-LLaMA-Factory/saves/qwen2.5-7BI-cot_w_harm_gemini_v3/full/sft/checkpoint-12885
 # use PROJECT_DIR_WXY (not PROJECT_DIR) for magic sft checkpoints
 QWEN257BI_SFT_WOCODE_MODEL_PATH=$PROJECT_DIR_WXY/src/360-LLaMA-Factory/saves/qwen2.5-7BI-cot_w_harm_gemini_wocode/full/sft/checkpoint-8367
+QWEN257BI_SFT_DACE_MODEL_PATH=/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-sft/qwen2d5-7b_v2_full_sft_dsz2/checkpoint-14571
 QWEN2514B_SFT_MODEL_PATH=$PROJECT_DIR/src/360-LLaMA-Factory/saves/qwen2.5-14BI-cot_w_harm_gemini/full/sft/checkpoint-9705
 QWEN2514B_SFT_WOCODE_MODEL_PATH=$PROJECT_DIR/src/360-LLaMA-Factory/saves/qwen2.5-14BI-cot_w_harm_gemini_wocode/full/sft/checkpoint-8367
 QWEN38BI_MODEL_PATH=$PROJECT_DIR/src/360-LLaMA-Factory/saves/qwen3-8B-cot_w_harm_gemini/full/sft/checkpoint-8800
@@ -95,7 +96,7 @@ export PYTHONPATH=$(pwd)/src/verl:$PYTHONPATH
 ray stop --force
 
 mkdir -p "logs/${project_name}/${experiment_name}"
-ray start --head --port=$RAY_MASTER_PORT --dashboard-host=0.0.0.0 --num-gpus 4
+ray start --head --port=$RAY_MASTER_PORT --dashboard-host=0.0.0.0 --num-gpus 8
 
 sleep 30
 
@@ -124,7 +125,7 @@ PYTHONUNBUFFERED=1 python -m verl.separated_trainer.main_ppo \
     trainer.default_local_dir="${CHECKPOINT_DIR}/Game-separated/${experiment_name}" \
     trainer.resume_mode=disable \
     trainer.nnodes=1 \
-    trainer.n_gpus_per_node=2 \
+    trainer.n_gpus_per_node=4 \
     data.train_files=data/safety/train_dace.parquet \
     data.val_files=data/safety/test_wjb_dace.parquet \
     data.val_batch_size=256 \
@@ -155,11 +156,11 @@ PYTHONUNBUFFERED=1 python -m verl.separated_trainer.main_ppo \
     +trainer.save_val_generations=True \
     +trainer.save_train_generations=True \
     trainer.test_freq=15 \
-    trainer.save_freq=15 \
+    trainer.save_freq=150 \
     trainer.total_epochs=1 \
     trainer.total_training_steps=300 \
     algorithm.adv_estimator=grpo \
-    algorithm.switch_agent.model_paths=[${QWEN257BI_SFT_WOCODE_MODEL_PATH},${QWEN_257BI_MODEL_PATH}] \
+    algorithm.switch_agent.model_paths=[${QWEN257BI_SFT_DACE_MODEL_PATH},${QWEN_257BI_MODEL_PATH}] \
     algorithm.switch_agent.agent_roles=[attacker,defender] \
     algorithm.switch_agent.train_roles=[attacker,defender] \
     algorithm.switch_agent.start_agent=attacker \
@@ -176,11 +177,11 @@ PYTHONUNBUFFERED=1 python -m verl.separated_trainer.main_ppo \
     algorithm.diversity.lambda_fail=0.5 \
     algorithm.diversity.epsilon=1e-8 \
     algorithm.replay_pool.enable=True \
-    algorithm.replay_pool.replay_batch_size=32 \
+    algorithm.replay_pool.replay_batch_size=64 \
     algorithm.replay_pool.gamma_decay=0.90 \
     algorithm.replay_pool.prune_threshold=0.45 \
     algorithm.replay_pool.prune_min_trials=2.0 \
-    algorithm.replay_pool.max_pool_size=2000 \
+    algorithm.replay_pool.max_pool_size=4000 \
     algorithm.replay_pool.alpha_prior=1.0 \
     algorithm.replay_pool.beta_prior=1.0 \
     algorithm.replay_pool.clip_negative=True \
