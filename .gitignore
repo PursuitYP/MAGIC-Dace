@@ -41,7 +41,7 @@ eval-dace/safety-eval-fork/evaluation/tasks/generation/alpacaeval/cache/alpaca_e
 
 # Externally cloned eval repos and datasets (not subprojects of this repo)
 eval-dace/AISafetyLab/
-eval-dace/OpenRT/
+eval-dace/OpenRT/results/
 eval-dace/safety-eval-fork/evaluation/tasks/generation/codex_eval/humanevalpack/
 eval-dace/safety-eval-fork/evaluation/tasks/generation/or_bench/strongreject/
 eval-dace/safety-eval-fork/evaluation/tasks/generation/x-teaming/
