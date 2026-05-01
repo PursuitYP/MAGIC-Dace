@@ -128,38 +128,64 @@ class ArchivePool:
         # Cache for diversity reward denominator
         self._cached_max_delta: Optional[float] = None
 
+        ### dace: pool flow counters (per-step, reset via pop_*_counter) ###
+        self._entries_added_this_step: int = 0
+        self._entries_evicted_this_step: int = 0
+
     # ──────────────────────────────────────────────────────────────
     # Strategy extraction
     # ──────────────────────────────────────────────────────────────
+
+    ### dace: relax strategy regex + unified fuzzy fallback ###
+    # Relaxed strategy regex: tolerates missing newline between risk & style
+    # (for checkpoints not trained on DACE format), any whitespace combination,
+    # Chinese colon "：", inline separators (comma / semicolon / newline / space).
+    # `[\s,;]+` requires ≥1 whitespace/comma/semicolon — this is the minimum
+    # separator needed after the risk value, before "attack style:" literal.
+    _STRATEGY_PATTERN = re.compile(
+        r'<strategy>\s*'
+        r'risk\s*category\s*[:：]\s*(.+?)\s*'
+        r'[\s,;]+\s*'
+        r'attack\s*style\s*[:：]\s*(.+?)\s*'
+        r'</strategy>',
+        re.DOTALL | re.IGNORECASE,
+    )
+
+    @staticmethod
+    def _match_slot(risk_str: str, style_str: str) -> Optional[Tuple[int, int]]:
+        """Map raw risk/style strings to slot indices via exact + fuzzy substring match.
+
+        Shared helper so both ArchivePool.extract_strategy and
+        reward_score.game.extract_strategy_text use identical matching logic.
+        Returns (risk_idx, style_idx) or None if either is unmatchable.
+        """
+        risk_str = (risk_str or "").strip().lower()
+        style_str = (style_str or "").strip().lower()
+        risk_idx = _RISK_LOOKUP.get(risk_str)
+        style_idx = _STYLE_LOOKUP.get(style_str)
+        if risk_idx is None:
+            for key, idx in _RISK_LOOKUP.items():
+                if key in risk_str or risk_str in key:
+                    risk_idx = idx
+                    break
+        if style_idx is None:
+            for key, idx in _STYLE_LOOKUP.items():
+                if key in style_str or style_str in key:
+                    style_idx = idx
+                    break
+        if risk_idx is None or style_idx is None:
+            return None
+        return (risk_idx, style_idx)
 
     @staticmethod
     def extract_strategy(text: str) -> Optional[Tuple[int, int]]:
         """Parse <strategy> tags and return (risk_idx, style_idx) or None."""
         if not text:
             return None
-        pattern = r'<strategy>\s*risk category:\s*(.+?)\s*\n\s*attack style:\s*(.+?)\s*</strategy>'
-        match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+        match = ArchivePool._STRATEGY_PATTERN.search(text)
         if not match:
             return None
-        risk_str = match.group(1).strip().lower()
-        style_str = match.group(2).strip().lower()
-        risk_idx = _RISK_LOOKUP.get(risk_str)
-        style_idx = _STYLE_LOOKUP.get(style_str)
-        if risk_idx is None or style_idx is None:
-            # Try substring matching as fallback
-            if risk_idx is None:
-                for key, idx in _RISK_LOOKUP.items():
-                    if key in risk_str or risk_str in key:
-                        risk_idx = idx
-                        break
-            if style_idx is None:
-                for key, idx in _STYLE_LOOKUP.items():
-                    if key in style_str or style_str in key:
-                        style_idx = idx
-                        break
-        if risk_idx is None or style_idx is None:
-            return None
-        return (risk_idx, style_idx)
+        return ArchivePool._match_slot(match.group(1), match.group(2))
 
     # ──────────────────────────────────────────────────────────────
     # Entropy computation
@@ -236,7 +262,8 @@ class ArchivePool:
     def add_entry(self, entry: ArchiveEntry) -> bool:
         """Add successful attack to pool. Returns True if new entry, False if duplicate.
 
-        For duplicates, increments existing entry's successes.
+        For duplicates, increments existing entry's successes. Per-step counters
+        (added / evicted) are updated here for metric observability.
         """
         h = self._prompt_hash(entry.prompt_text)
         if h in self.prompt_hash_set:
@@ -253,10 +280,14 @@ class ArchivePool:
         r, s = entry.strategy
         self.slot_counts[r, s] += 1.0
         self._invalidate_cache()
+        ### dace: pool flow metric — added entry ###
+        self._entries_added_this_step += 1
 
         # Enforce max size: drop entry with lowest posterior mean
         if len(self.entries) > self.max_pool_size:
             self._drop_lowest_value_entry()
+            ### dace: pool flow metric — evicted due to size cap ###
+            self._entries_evicted_this_step += 1
 
         return True
 
@@ -342,6 +373,41 @@ class ArchivePool:
             self.entries[entry_idx].successes += 1.0
         else:
             self.entries[entry_idx].failures += 1.0
+
+    # ──────────────────────────────────────────────────────────────
+    ### dace: pool flow metrics (P1.1 — diagnose saturation dynamics) ###
+    # ──────────────────────────────────────────────────────────────
+
+    def pop_added_counter(self) -> int:
+        """Return # entries added this step and reset counter to 0."""
+        val = self._entries_added_this_step
+        self._entries_added_this_step = 0
+        return val
+
+    def pop_evicted_counter(self) -> int:
+        """Return # entries evicted (due to size cap) this step and reset."""
+        val = self._entries_evicted_this_step
+        self._entries_evicted_this_step = 0
+        return val
+
+    def zombie_fraction(self) -> float:
+        """Fraction of entries with zero trials (never replayed / posterior never updated).
+
+        High zombie_fraction (> 0.8) means Thompson sampling is over-exploiting a
+        small set of entries while new entries get evicted before any posterior update.
+        Healthy range: 0.3–0.5 at steady state.
+        """
+        if not self.entries:
+            return 0.0
+        zombies = sum(1 for e in self.entries if (e.successes + e.failures) == 0)
+        return zombies / len(self.entries)
+
+    def effective_replay_pool_size(self) -> int:
+        """# entries that have been replayed at least once (non-zombie).
+
+        This is the set Thompson sampling can meaningfully prioritize beyond prior.
+        """
+        return sum(1 for e in self.entries if (e.successes + e.failures) > 0)
 
     # ──────────────────────────────────────────────────────────────
     # Checkpoint save / load

@@ -108,14 +108,40 @@ def extract_think(text: str) -> str | None:
     return ""
 
 ### dace: extract strategy (risk_category, attack_style) from <strategy> tags ###
+# Uses the relaxed pattern shared with ArchivePool.extract_strategy — tolerates
+# missing newline between risk & style, inline separators, and applies fuzzy
+# substring fallback via ArchivePool._match_slot so this function's view of
+# "extractable" stays aligned with the pool's insertion criterion.
 def extract_strategy_text(text: str) -> Optional[tuple]:
     """Extract (risk_category_str, attack_style_str) from <strategy> tags.
-    Returns a 2-tuple of strings or None if unparseable."""
-    pattern = r'<strategy>\s*risk category:\s*(.+?)\s*\n\s*attack style:\s*(.+?)\s*</strategy>'
+
+    Returns a 2-tuple of raw strings (may not map cleanly to the 14×10 slot
+    space — use extract_strategy_slot for validated index pairs).
+    """
+    pattern = (
+        r'<strategy>\s*'
+        r'risk\s*category\s*[:：]\s*(.+?)\s*'
+        r'[\s,;]+\s*'
+        r'attack\s*style\s*[:：]\s*(.+?)\s*'
+        r'</strategy>'
+    )
     match = re.search(pattern, text or "", re.DOTALL | re.IGNORECASE)
     if match:
         return (match.group(1).strip(), match.group(2).strip())
     return None
+
+
+### dace: unified strategy extraction aligned with ArchivePool slot space ###
+def extract_strategy_slot(text: str) -> Optional[tuple]:
+    """Parse <strategy> tags and return (risk_idx, style_idx) or None.
+
+    Delegates to ArchivePool.extract_strategy so both pathways (reward-side
+    format validation and pool insertion) apply identical relaxed regex +
+    fuzzy fallback. Import is done lazily to avoid a circular dependency
+    with the separated_trainer package.
+    """
+    from verl.separated_trainer.ppo.archive_pool import ArchivePool
+    return ArchivePool.extract_strategy(text)
 
 def _clamp_unit_interval(value: float) -> float:
     return max(0.0, min(1.0, value))

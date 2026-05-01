@@ -2134,6 +2134,16 @@ class RayReMASeparatedTrainer(object):
                         metrics['archive/coverage_entropy'] = self.archive_pool.compute_coverage_entropy()
                         n_occupied = int((self.archive_pool.slot_counts > 0).sum())
                         metrics['archive/strategy_coverage'] = float(n_occupied) / ArchivePool.N_SLOTS
+                        ### dace: pool flow metrics — diagnose saturation dynamics (P1.1) ###
+                        # entries_added_this_step: how many distinct new entries entered the pool this step
+                        # entries_evicted_this_step: how many evicted due to max_pool_size cap
+                        # effective_replay_pool_size: entries with at least one posterior update (non-zombie)
+                        # zombie_fraction: entries that have never been Thompson-sampled (s+f=0)
+                        # Healthy steady state: added ≈ evicted, zombie_fraction 0.3-0.5
+                        metrics['archive/entries_added_this_step'] = self.archive_pool.pop_added_counter()
+                        metrics['archive/entries_evicted_this_step'] = self.archive_pool.pop_evicted_counter()
+                        metrics['archive/effective_replay_pool_size'] = self.archive_pool.effective_replay_pool_size()
+                        metrics['archive/zombie_fraction'] = self.archive_pool.zombie_fraction()
 
                     ### dace: masked attacker format metric (exclude replay samples) ###
                     if ('attacker_format_reward' in reward_tensor_map
