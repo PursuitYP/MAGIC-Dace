@@ -1,16 +1,20 @@
 #!/bin/bash
 
 # 配置
-MODEL_PATH="/mnt/shared-storage-user/wenxiaoyu/hezhida/TROJail/checkpoints/MUSE_D/lora_merged/all_pairs/global_step_60"
-MODEL_NAME="muse-s60"
+# MODEL_PATH="/mnt/shared-storage-user/wenxiaoyu/hezhida/TROJail/checkpoints/MUSE_D/lora_merged/all_pairs/global_step_60"
+# MODEL_NAME="muse-s60"
+MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_full-2026-04-26_22-00-31/global_step_300/defender/actor/huggingface"
+MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
 
 # Qwen defender 模型建议使用 game_defender
 # 如果切到普通 instruct 模型，可改成 "hf"
 
 # 可选: "mmlu" / "mtbench" / "gsm8k"
-TASKS="mmlu,gsm8k"
+# TASKS="mmlu,gsm8k"
+TASKS="mmlu"
 
-RESULTS_DIR="/mnt/shared-storage-user/wenxiaoyu/game-private/eval/safety-eval-fork/results/multi-turn-defense/MUSE/$MODEL_NAME-helpful/-$(date +%Y%m%d_%H%M%S)"
+# RESULTS_DIR="/mnt/shared-storage-user/wenxiaoyu/game-private/eval/safety-eval-fork/results/multi-turn-defense/MUSE/$MODEL_NAME-helpful/-$(date +%Y%m%d_%H%M%S)"
+RESULTS_DIR="/mnt/shared-storage-user/yupeng/MAGIC/eval-dace/safety-eval-fork/results/dace/$TASKS-$MODEL_NAME-$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$RESULTS_DIR"
 
 # 环境变量

@@ -6,18 +6,24 @@
 # 配置/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/wenxiaoyu/game/checkpoints/Game-separated/v3-D-q257bi-A-sftv4-balanced-reward1_0.5_0.5-woDformat-ratio21-freq10-add_label_reward-revised_label-2026-01-04_14-57-52/global_step_285/defender/actor/huggingface"
 #/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/wenxiaoyu/game/checkpoints/Game-separated/v3-D-q257bi-A-sftv4-balanced-8192-reward1_0.5_0.5-woDformat-ratio11-freq15-add_label_reward-revised_label-2026-01-04_14-57-50/global_step_285/defender/actor/huggingface"
 #MODEL_PATH="/mnt/shared-storage-gpfs2/gpfs2-shared-public/huggingface/hub/models--Qwen--Qwen2.5-14B-Instruct/snapshots/cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8"
-MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/wenxiaoyu/game/checkpoints/Game-separated/v5-D-q257bi-A-q257bisft_wocode-reward1_0.5_0-wDformat-wo_label_reward-revised_label-2026-01-25_07-32-02/global_step_150/defender/actor/huggingface"
+# MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/wenxiaoyu/game/checkpoints/Game-separated/v5-D-q257bi-A-q257bisft_wocode-reward1_0.5_0-wDformat-wo_label_reward-revised_label-2026-01-25_07-32-02/global_step_150/defender/actor/huggingface"
 
-MODEL_NAME=nocot-s210-q257b-it
-RESULTS_BASE_DIR="/mnt/shared-storage-user/wenxiaoyu/game-private/eval/olmes/results/ablation/$MODEL_NAME/7benchmarks-$(date +%Y%m%d_%H%M%S)"
+# MODEL_NAME=nocot-s210-q257b-it
+
+# MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_full-2026-04-26_22-00-31/global_step_300/defender/actor/huggingface"
+MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
+# RESULTS_BASE_DIR="/mnt/shared-storage-user/wenxiaoyu/game-private/eval/olmes/results/ablation/$MODEL_NAME/7benchmarks-$(date +%Y%m%d_%H%M%S)"
+RESULTS_BASE_DIR="/mnt/shared-storage-user/yupeng/MAGIC/eval-dace/olmes/results/dace/$MODEL_NAME-$(date +%Y%m%d_%H%M%S)"
 mkdir -p $RESULTS_BASE_DIR
 
 # 环境变量
 export HF_DATASETS_CACHE=/data/hf_cache
 export HF_TOKEN="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"
-#export HF_DATASETS_OFFLINE=1
-#export HF_HUB_OFFLINE=1
+export HF_DATASETS_OFFLINE=1
+export HF_HUB_OFFLINE=1
 export HF_DATASETS_VERBOSITY=info
+### dace: point tiktoken to litellm's pre-bundled cl100k_base cache so offline GPU nodes don't try to fetch it from openaipublic.blob.core.windows.net ###
+export TIKTOKEN_CACHE_DIR=/home/yupeng/.conda/envs/olmes/lib/python3.10/site-packages/litellm/litellm_core_utils/tokenizers
 
 # 激活环境
 eval "$(conda shell.bash hook)"
@@ -59,8 +65,8 @@ fi
 # 定义所有任务
 TASKS=(
   "ifeval"
-#  "arc_challenge"
-#   "gpqa"
+  "arc_challenge"
+  "gpqa"
 #   "truthfulqa"
 #   "mmlu"
 #   "gsm8k"

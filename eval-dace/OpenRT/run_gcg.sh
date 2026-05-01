@@ -65,8 +65,8 @@ MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
 # ------------------------------------------------------------------------------
 # Select which attacks to run. Options: pair, tree, gcg, autodan, autodan_turbo, autodan_turbo_r, magic, no_revision
 # To run baseline evaluation without any attack, set: ATTACKS="no_revision"
-# ATTACKS="gcg"
-ATTACKS="no_revision pair tree autodan autodan_turbo_r"
+ATTACKS="gcg"
+# ATTACKS="no_revision pair tree autodan autodan_turbo_r"
 
 # ------------------------------------------------------------------------------
 # 4. Test Prompts / Dataset
@@ -74,6 +74,7 @@ ATTACKS="no_revision pair tree autodan autodan_turbo_r"
 # Use HarmBench dataset
 DATASET_PATH="/mnt/shared-storage-user/wenxiaoyu/game-private/eval/OpenRT/seed/harmbench/harmbench_behaviors_text_test.csv"
 NUM_SAMPLES="" # Number of prompts to test (set to empty for all)
+# NUM_SAMPLES=5     # test usage
 MAX_TURNS=3
 JUDGE_THRESHOLD=5
 
@@ -87,7 +88,8 @@ JUDGE_THRESHOLD=5
 # ------------------------------------------------------------------------------
 # Directory to save results (JSON history, summaries, logs)
 # RESULTS_DIR="./results/0119-wocode-s195-llama3.1-8b-it"
-RESULTS_DIR="/mnt/shared-storage-user/yupeng/MAGIC/eval-dace/OpenRT/results/dace/$MODEL_NAME-$(date +%Y%m%d_%H%M%S)"
+# RESULTS_DIR="/mnt/shared-storage-user/yupeng/MAGIC/eval-dace/OpenRT/results/dace/$MODEL_NAME-$(date +%Y%m%d_%H%M%S)"
+RESULTS_DIR="/mnt/shared-storage-user/yupeng/MAGIC/eval-dace/OpenRT/results/dace/$ATTACKS-$MODEL_NAME-$(date +%Y%m%d_%H%M%S)"
 
 # ------------------------------------------------------------------------------
 # Execution (Do not modify below unless necessary)

@@ -1,12 +1,18 @@
 #!/bin/bash
 
 # Configuration
-export OPENAI_API_KEY="sk-xI8zGRXkgJzoejUP7KtcBbRfqNazmWnFqSNuw6zMn5rZClFy"
-export OPENAI_BASE_URL="https://api.boyuerichdata.opensphereai.com/v1"
+# export OPENAI_API_KEY="sk-xI8zGRXkgJzoejUP7KtcBbRfqNazmWnFqSNuw6zMn5rZClFy"
+# export OPENAI_BASE_URL="https://api.boyuerichdata.opensphereai.com/v1"
+export OPENAI_API_KEY="sk-ua4rD1WerZKpDyb7JHOSKxVvMmvMZIKi6rXGPotdX9nfxNXr"
+export OPENAI_BASE_URL="http://35.220.164.252:3888/v1/"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 # Default directories if not provided as arguments
+# modify the default target directories as needed
+ATTACKS="gcg"
+MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
+TIMESTAMP="20260430_191400"    # replace with fixed timestamp
 if [ "$#" -gt 0 ]; then
   TARGET_DIRS=("$@")
 else
@@ -16,7 +22,8 @@ else
 #    "$SCRIPT_DIR/results/0118-wocode-qwen2.5-14b-it/gcg"
 #    "$SCRIPT_DIR/results/selfeval-qwen2.5-14b-it-defense/gcg"
 #    "$SCRIPT_DIR/results/baseline/llama3.1-8b-it/gcg"
-    "$SCRIPT_DIR/results/0119-wocode-s195-llama3.1-8b-it/gcg"
+    # "$SCRIPT_DIR/results/0119-wocode-s195-llama3.1-8b-it/gcg"
+    "/mnt/shared-storage-user/yupeng/MAGIC/eval-dace/OpenRT/results/dace/$ATTACKS-$MODEL_NAME-$TIMESTAMP/gcg"
   )
 fi
 echo "----------------------------------------------------------------"
@@ -33,7 +40,9 @@ cd "$SCRIPT_DIR"
 
 for dir in "${TARGET_DIRS[@]}"; do
   name="$(basename "$(dirname "$dir")")"
-  out_file="gcg_evaluation_summary_${name}.json"
+  outdir="/mnt/shared-storage-user/yupeng/MAGIC/eval-dace/OpenRT/results/dace/$ATTACKS-$MODEL_NAME-$TIMESTAMP/judge-gcg"
+  mkdir -p "$outdir"
+  out_file="$outdir/gcg_evaluation_summary.json"
   python3 judge_gcg.py \
       --results-dir "$dir" \
       --judge-api-key "$OPENAI_API_KEY" \

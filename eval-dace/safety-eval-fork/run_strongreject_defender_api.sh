@@ -8,22 +8,27 @@
 # ==============================================================================
 
 # Defender API配置（用于生成回答）
-export DEFENDER_API_BASE_URL="http://s-20260330132942-vvph7-decode.ailab-safethm.svc:23302/v1"
+# export DEFENDER_API_BASE_URL="http://s-20260330132942-vvph7-decode.ailab-safethm.svc:23302/v1"
+export DEFENDER_API_BASE_URL="http://s-20260429151904-5j4n7-decode.ailab-safethm.svc:28658/v1"
 export DEFENDER_API_KEY="FAKE_API_KEY"
 export DEFENDER_API_MODEL="orm"
 
 
 # GPT-4o API配置（用于评分）有点问题，为什么连不上了
 #export OPENAI_API_KEY="sk-xI8zGRXkgJzoejUP7KtcBbRfqNazmWnFqSNuw6zMn5rZClFy"
-export OPENAI_API_KEY="sk-D0wGaXJBOV1f6VTnJzwRuhLewJ0Crn1KNQeSXnRRn2dM6ITR"
-export OPENAI_BASE_URL="https://api.boyuerichdata.opensphereai.com/v1"
+# export OPENAI_API_KEY="sk-D0wGaXJBOV1f6VTnJzwRuhLewJ0Crn1KNQeSXnRRn2dM6ITR"
+# export OPENAI_BASE_URL="https://api.boyuerichdata.opensphereai.com/v1"
+export OPENAI_API_KEY="sk-ua4rD1WerZKpDyb7JHOSKxVvMmvMZIKi6rXGPotdX9nfxNXr"
+export OPENAI_BASE_URL="http://35.220.164.252:3888/v1/"
 export OPENAI_MODEL="gpt-4o"
 
 # 任务和结果配置
-MODEL_NAME="CoT-s165"  # 使用defender_api标识
+# MODEL_NAME="CoT-s165"  # 使用defender_api标识
+MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
 
 TASKS="strongreject"  # 使用完整数据集（313个样本），如需测试可用"strongreject:small"（60个样本）
-RESULTS_DIR="./results/rebuttal/$MODEL_NAME/$TASKS/-$(date +%Y%m%d_%H%M%S)"
+# RESULTS_DIR="./results/rebuttal/$MODEL_NAME/$TASKS/-$(date +%Y%m%d_%H%M%S)"
+RESULTS_DIR="/mnt/shared-storage-user/yupeng/MAGIC/eval-dace/safety-eval-fork/results/dace/$TASKS-$MODEL_NAME-$(date +%Y%m%d_%H%M%S)"
 mkdir -p $RESULTS_DIR
 
 # Hugging Face配置

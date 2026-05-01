@@ -41,20 +41,21 @@
 
 
 # dace
-MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/D-q257bi-A-q257bisft_wocode-reward1_0.5_0-woDformat-wo_label_reward-revised_label-tp2-2026-03-31_12-55-34/global_step_300"
-
+MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_full-2026-04-26_22-00-31/global_step_300/defender/actor/huggingface"
+MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
 
 
 #MODEL_NAME="0122-no_game-llama3.1-8b-it"
 #MODEL_NAME="0123-no_game-qwen2.5-14b-it"
-MODEL_NAME=Muse-step60
+# MODEL_NAME=Muse-step60
 #MODEL_NAME="v4-1.6-freq15-ratio11-revised_label"
 #TASKS="wildguardtest"
 TASKS="wildguardtest,harmbench_precompute,wildjailbreak:benign,wildjailbreak:harmful,do_anything_now,harmbench,or_bench:hard-1k,or_bench:toxic,xstest"
 # TASKS="wildjailbreak:benign,xstest"
 #STEP="240"
 CLASSIFIER="Qwen3GuardAPI"  # 新增：指定分类器
-RESULTS_DIR="/mnt/shared-storage-user/wenxiaoyu/game-private/eval/safety-eval-fork/results/multi-turn-defense/MUSE/$MODEL_NAME/$CLASSIFIER/-$(date +%Y%m%d_%H%M%S)"
+# RESULTS_DIR="/mnt/shared-storage-user/wenxiaoyu/game-private/eval/safety-eval-fork/results/multi-turn-defense/MUSE/$MODEL_NAME/$CLASSIFIER/-$(date +%Y%m%d_%H%M%S)"
+RESULTS_DIR="/mnt/shared-storage-user/yupeng/MAGIC/eval-dace/safety-eval-fork/results/dace/$MODEL_NAME-$CLASSIFIER-$(date +%Y%m%d_%H%M%S)"
 mkdir -p $RESULTS_DIR
 
 # 环境变量
