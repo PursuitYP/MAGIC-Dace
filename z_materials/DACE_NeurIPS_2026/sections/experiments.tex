@@ -1,0 +1,231 @@
+% ==========================================================
+% == Section 5: Experiments                                ==
+% ==========================================================
+\section{Experiments}
+\label{sec:experiments}
+
+% [Section 5 引子段] 大意:用一段 RQ 列表开篇,让读者一眼看到本章要回答的问题,呼应 intro 的三条贡献。
+% 撰写逻辑:点出防御者/攻击者/ablation 三条线；列出 5 个 RQ;最后一句话指向附录扩展结果。
+% 中文对应内容:我们围绕五个研究问题（RQ)评估 DACE。RQ1 考察 DACE 的防御者在标准安全 benchmark 上是否在不牺牲 benign 合规率的前提下取得更低 ASR；RQ2 考察 DACE 是否引入通用能力退化；RQ3 考察 DACE 对 SOTA 自动红队工具的鲁棒性；RQ4 考察 DACE 攻击者是否展现策略层级多样性;RQ5 考察贝叶斯回放池是否缓解对抗遗忘。扩展结果（多 backbone 交叉、多 judge 验证、训练动态)见附录 \ref{apdx:expanded-results}。
+We design our experiments around five research questions that correspond directly to the contributions of \method. \textbf{(RQ1)} Does the \method defender attain lower attack success rates (ASR) on standard safety benchmarks than MAGIC, Self-RedTeam, SSP, and other co-evolution baselines, without incurring over-refusal on benign prompts? \textbf{(RQ2)} Does \method preserve general-purpose capability? \textbf{(RQ3)} Does \method generalize to state-of-the-art automated red-teaming attackers it has never seen during training? \textbf{(RQ4)} Does the \method attacker cover the strategy space more broadly and more evenly than prior attackers, at the strategy level rather than just the textual level? \textbf{(RQ5)} Does the Bayesian adversarial replay pool prevent defense adversarial forgetting of earlier attacks? Expanded results (additional backbones, judge cross-validation, and training dynamics) are deferred to Appendix~\ref{apdx:expanded-results}.
+
+% ----------------------------------------------------------
+% 5.1 Experimental Setup
+% ----------------------------------------------------------
+\subsection{Experimental Setup}
+\label{sec:exp-setup}
+
+% [段 5.1.1] 大意:模型与基线。
+% 撰写逻辑:先说 backbone；再列 baseline（base / Self-RedTeam / MAGIC / SSP，可选 SEAS/AdvEvo-MARL);强调 DACE 和所有 baseline 使用同一 defender base、同一 judge,以消除混淆变量。
+% 中文对应内容:我们以 Qwen2.5-7B-Instruct 作为主 backbone,并以 Llama3.1-8B-Instruct 验证跨 backbone 鲁棒性。基线包含:(1) 原 Instruct 模型（Base）;(2) Self-RedTeam（零和自博弈);(3) MAGIC（非对称序贯博弈);(4) SSP（自博弈+经验回放);并在附录中补充 SEAS / AdvEvo-MARL。所有协同演化基线使用与 DACE 相同的 attacker SFT 种子集、相同的 defender 基模、相同的 judge（Qwen3Guard 训练内评估 + GPT-4o 独立评估),以消除训练数据与评估通道带来的混淆。
+\paragraph{Models and baselines.} We use \textbf{Qwen2.5-7B-Instruct}~\citep{yang2025qwen25} as the primary defender backbone, and \textbf{Llama3.1-8B-Instruct}~\citep{touvron2023llama} for cross-backbone validation. \method is compared against (i) the un-aligned \textbf{Base} model; (ii) \textbf{Self-RedTeam}~\citep{liu2025chasing}; (iii) \textbf{MAGIC}~\citep{magic2025}; (iv) \textbf{SSP}~\citep{ssp2026}; and, in the appendix, \textbf{SEAS}~\citep{seas2025} and \textbf{AdvEvo-MARL}~\citep{pan2025advevo}. To keep the comparison apples-to-apples, every co-evolutionary baseline uses the same attacker SFT seed set, the same defender base model, and the same judges (Qwen3Guard~\citep{zhao2025qwen3guard} for in-distribution training feedback, and GPT-4o as an independent out-of-distribution verifier), so that differences are attributable to training mechanisms rather than to supervision pipelines.
+
+% [段 5.1.2] 大意:训练超参 + 评估协议概述。
+% 撰写逻辑:简要说明 RL 训练框架（VeRL / GRPO)、轮数、策略空间、λ 系数、archive 大小、Thompson 先验等;提 judge 使用 Qwen3Guard + GPT-4o 双 judge;完整超参表见附录 D。
+% 中文对应内容:RL 训练基于 veRL 框架并采用 GRPO 优化器;DACE 训练 K 轮,每轮包含 Stage 1/Stage 2 各若干 step;默认配置使用 γ_decay=0.97, α=β=1 的均匀 Beta 先验, B_train/B_replay=2:1, 剪枝阈值 ε=0.05 与 n_min=8。判官在训练中使用 Qwen3Guard（稳定、成本低）,在主 benchmark 评估中使用 GPT-4o 做独立验证以避免 reward hacking;完整超参与训练细节见附录 \ref{apdx:training-setup}。
+\paragraph{Training and evaluation protocols.} Co-evolution is run on the veRL framework~\citep{sheng2025verl} with GRPO~\citep{shao2024grpo} as the inner optimizer. Unless stated otherwise, \method uses a uniform Beta prior ($\alpha=\beta=1$), time decay $\gamma=0.97$, a $2\!:\!1$ ratio of fresh to replayed attacks per defender mini-batch, and pruning thresholds $\epsilon=0.05$ and $n_{\min}=8$. Training-time supervision uses Qwen3Guard for cost and stability, whereas all main-table benchmarks are additionally scored by GPT-4o for independent verification to rule out reward-hacking artifacts. Detailed hyperparameters and compute budget appear in Appendix~\ref{apdx:training-setup}.
+
+% ----------------------------------------------------------
+% 5.2 Main Results (RQ1-RQ5)
+% ----------------------------------------------------------
+\subsection{Main Results}
+\label{sec:exp-main}
+
+% ----------------------- RQ1 -----------------------
+\begin{rqbox}
+\textbf{RQ1:} \textit{Does \method's defender achieve lower ASR on adversarial prompts without incurring over-refusal on benign prompts?}
+\end{rqbox}
+
+% [Table 1 caption note] 大意:给出 9 个 safety + benign 的 benchmark 组合。
+% 撰写逻辑:把 9 个 benchmark 分为 harmful（要 ASR 低)和 benign（要 comply 高)两类,分别赋 ASR↓ / Comply↑ 符号；每行一个方法,包含 Base / Self-RedTeam / MAGIC / SSP / DACE(ours);数据用 -- 占位。
+\begin{table}[t]
+  \centering
+  \small
+  \caption{\textbf{RQ1 — Safety benchmarks (Qwen2.5-7B-Instruct).} Harmful-prompt ASR ($\downarrow$) and benign-prompt compliance / over-refusal ($\uparrow$ / $\downarrow$) across nine standard safety suites. All entries are placeholders and will be filled in once evaluation completes. Best per column in \textbf{bold}; second-best \underline{underlined}.}
+  \label{tab:rq1-safety}
+  \setlength{\tabcolsep}{3.2pt}
+  \begin{tabularx}{\linewidth}{l *{6}{>{\centering\arraybackslash}X} *{3}{>{\centering\arraybackslash}X}}
+    \toprule
+     & \multicolumn{6}{c}{\textbf{Harmful (ASR $\downarrow$)}} & \multicolumn{3}{c}{\textbf{Benign}} \\
+    \cmidrule(lr){2-7}\cmidrule(lr){8-10}
+    \textbf{Method} & \makecell{WG\\Test} & \makecell{WJB\\adv} & \makecell{Harm-\\Bench adv} & DAN & \makecell{OR-\\Bench} & \makecell{Strong-\\REJECT} & \makecell{XSTest\\safe\,$\uparrow$} & \makecell{WJB\\benign\,$\uparrow$} & \makecell{XSTest\\unsafe$_{\mathrm{RTA}}\downarrow$} \\
+    \midrule
+    Base              & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    Self-RedTeam      & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    MAGIC             & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    SSP               & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \rowcolor{cyan!8}\textbf{\method (ours)} & -- & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+% [RQ1 解读段] 大意:预期结果解读,用 "is expected to" 句式。
+% 撰写逻辑:先说 harmful 端 DACE 期望全面超过 MAGIC/SSP,特别是在需要策略多样性的 benchmark（DAN、WJB adv、HarmBench adv）；再说 benign 端 DACE 通过 v4 的 benign template 修复 + 差异化 λ 系数保持 comply rate 与 MAGIC 持平而不是过拒;XSTest unsafe RTA 期望持平或略降（后者反映 defender 对边缘情况的细化决策）。
+% 中文对应内容:我们期望(i) 在对抗性 harmful benchmark 上,DACE 的 ASR 相较 MAGIC、SSP 有显著下降,尤其是 DAN / WJB adv / HarmBench adv 等强调策略多样性的数据集；(ii) 在 benign benchmark 上,DACE 的合规率与 MAGIC 持平,XSTest unsafe 的 RTA 基本不升甚至略降,说明额外的多样性训练与回放并未把防御者推向过拒。这一期望与我们在 §3 中对双病态的形式化一致——坍缩的 attacker 会让 defender "偏科"——而 DACE 通过策略覆盖把 defender 的训练分布推向更广的区域。
+\method is expected to improve on adversarial suites by a clear margin over MAGIC and SSP---especially on DAN, WildGuard-Test and HarmBench adversarial splits, which emphasize diverse attack styles that non-diverse baselines under-cover---while preserving benign compliance and not inflating XSTest over-refusal. This pattern is consistent with the formalization in Section~\ref{sec:preliminaries}: a collapsed attacker trains a narrow defender, and \method counters this by pushing defender training toward a broader, entropy-controlled distribution.
+
+% ----------------------- RQ2 -----------------------
+\begin{rqbox}
+\textbf{RQ2:} \textit{Does \method's safety improvement come at the cost of general capability?}
+\end{rqbox}
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{\textbf{RQ2 — General capability (Qwen2.5-7B-Instruct).} Higher is better ($\uparrow$) for all columns. Placeholder values.}
+  \label{tab:rq2-capability}
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{lcccccc}
+    \toprule
+    \textbf{Method} & \textbf{IFEval$_{\mathrm{P}}$} & \textbf{IFEval$_{\mathrm{I}}$} & \textbf{ARC-C} & \textbf{GPQA} & \textbf{MMLU} & \textbf{AlpacaEval 2} \\
+    \midrule
+    Base              & -- & -- & -- & -- & -- & -- \\
+    Self-RedTeam      & -- & -- & -- & -- & -- & -- \\
+    MAGIC             & -- & -- & -- & -- & -- & -- \\
+    SSP               & -- & -- & -- & -- & -- & -- \\
+    \rowcolor{cyan!8}\textbf{\method (ours)} & -- & -- & -- & -- & -- & -- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% [RQ2 解读段] 大意:DACE 对通用能力无退化,可能 GPQA 有小幅受益。
+% 中文对应内容:我们期望 DACE 与各 baseline 在一般能力指标上差距小于 2 个百分点,且在需要更强推理的 GPQA 上由于策略空间显式化对 attacker 生成更"有结构"的攻击,间接强迫 defender 学习更细致的拒答/回答判别,可能出现小幅提升。
+On general-capability suites, \method is expected to stay within $\pm 2$ points of the Base model and of the strongest co-evolution baseline, with no systematic regression across IFEval, ARC-C, GPQA, MMLU, or AlpacaEval~2. A mild positive effect on GPQA is plausible, since more structured attacker behavior forces the defender to learn sharper refusal/answer boundaries on ambiguous queries.
+
+% ----------------------- RQ3 -----------------------
+\begin{rqbox}
+\textbf{RQ3:} \textit{Does the \method defender generalize to state-of-the-art unseen automated red-teaming attackers?}
+\end{rqbox}
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{\textbf{RQ3 — OOD attacker robustness.} ASR ($\downarrow$) under external red-teaming attackers not seen during training. Placeholder values; MAJIC and AutoDAN-Turbo represent the most aggressive composition-style attackers available at time of writing.}
+  \label{tab:rq3-ood}
+  \setlength{\tabcolsep}{4.5pt}
+  \begin{tabular}{lccccccc}
+    \toprule
+    \textbf{Method} & \textbf{PAIR} & \textbf{TAP} & \textbf{AutoDAN} & \makecell{\textbf{AutoDAN}\\\textbf{-Turbo}} & \textbf{MAJIC} & \textbf{Auto-RT} & \textbf{X-Teaming} \\
+    \midrule
+    Base              & -- & -- & -- & -- & -- & -- & -- \\
+    Self-RedTeam      & -- & -- & -- & -- & -- & -- & -- \\
+    MAGIC             & -- & -- & -- & -- & -- & -- & -- \\
+    SSP               & -- & -- & -- & -- & -- & -- & -- \\
+    \rowcolor{cyan!8}\textbf{\method (ours)} & -- & -- & -- & -- & -- & -- & -- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% [RQ3 解读段] 大意:期望 DACE 在最强 OOD attacker（MAJIC + AutoDAN-Turbo + X-Teaming）上相对 MAGIC 降低 ASR 最明显,因为这些 attacker 采用组合式攻击。
+% 中文对应内容:我们期望 DACE 在最具挑战性的 MAJIC / AutoDAN-Turbo / X-Teaming 上相较 MAGIC 获得最大的相对 ASR 下降,因为这些 attacker 与 DACE 训练中涌现的组合攻击在分布上更接近;PAIR / TAP 等相对更"单发"的 attacker 下,DACE 与 MAGIC 的差距缩小,但仍保持优势。
+The OOD margin is expected to be largest on \textit{composition-heavy} attackers (MAJIC, AutoDAN-Turbo, X-Teaming), which share distributional traits with the combinatorial rewrites that \method's own attacker internalizes. Single-shot or query-optimization attackers such as PAIR and TAP are expected to show smaller but still consistent improvements over MAGIC and SSP.
+
+% ----------------------- RQ4 -----------------------
+\begin{rqbox}
+\textbf{RQ4:} \textit{Does the \method attacker cover the attack space more broadly and more evenly than prior attackers---at the strategy level rather than just the textual level?}
+\end{rqbox}
+
+% [Figure 3] 策略热力图(放实验完成后生成的脚本图)
+\begin{figure}[t]
+  \centering
+  \fbox{\rule[-2.4cm]{0pt}{4.8cm}\rule[-2.4cm]{0.95\linewidth}{0pt}}
+  \caption{\textbf{RQ4 — $12\times10$ attack-strategy heatmaps.} Color denotes the number of successful attacks per cell. \textbf{Left:} MAGIC attacker collapses to a handful of high-reward cells. \textbf{Middle:} \method without the coverage reward ($R_{\mathrm{div}}$ removed). \textbf{Right:} full \method spreads over a substantially larger fraction of the strategy space. Figure is a placeholder; actual heatmaps will be rendered from the final archive dump.}
+  \label{fig:strategy-heatmap}
+\end{figure}
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{\textbf{RQ4 — Multi-level attacker diversity.} Strategy-level metrics (primary, $\uparrow$ except Max-Cell Share $\downarrow$) and textual-level metrics (secondary). Computed on successful attacks against a shared evaluation defender. Placeholder values.}
+  \label{tab:rq4-diversity}
+  \setlength{\tabcolsep}{3.5pt}
+  \begin{tabular}{lcccccccc}
+    \toprule
+    & \multicolumn{4}{c}{\textbf{Strategy level}} & \multicolumn{4}{c}{\textbf{Textual level}} \\
+    \cmidrule(lr){2-5}\cmidrule(lr){6-9}
+    \textbf{Attacker} & \makecell{Cov.\\Rate$\uparrow$} & \makecell{Shannon\\Evenness$\uparrow$} & \makecell{QD-\\Score$\uparrow$} & \makecell{Max-Cell\\Share$\downarrow$} & \makecell{Self-\\BLEU$\downarrow$} & \makecell{Distinct-\\2$\uparrow$} & \makecell{SBERT\\Div.$\uparrow$} & \makecell{Vendi\\Score$\uparrow$} \\
+    \midrule
+    Rainbow Teaming    & -- & -- & -- & -- & -- & -- & -- & -- \\
+    MAGIC              & -- & -- & -- & -- & -- & -- & -- & -- \\
+    TriPlay-RL         & -- & -- & -- & -- & -- & -- & -- & -- \\
+    SSP                & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \rowcolor{cyan!8}\textbf{\method (ours)} & -- & -- & -- & -- & -- & -- & -- & -- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% [RQ4 解读段] 大意:DACE 期望在策略层指标上明显优于文本/embedding-level 方法（特别是 TriPlay-RL),在文本层指标上相当。
+% 中文对应内容:我们期望 DACE 在策略层指标（Coverage Rate, Shannon Evenness, QD-Score)上大幅领先,Max-Cell Share 显著更低（表示分布更均匀);而 TriPlay-RL 的 Self-BLEU 和 SBERT 等语义/词汇级指标可能与 DACE 相当甚至接近,却在策略层明显落后——这正是我们在 intro 中论证的"换皮不换招"现象。
+\method is expected to outperform prior baselines on the \emph{strategy-level} metrics---higher Coverage Rate, higher Shannon Evenness, higher QD-Score, and markedly lower Max-Cell Share---while matching or slightly trailing some baselines on pure textual-level metrics. The crucial comparison is with TriPlay-RL: prior work's semantic-level diversity signal can yield competitive Self-BLEU / SBERT numbers, but we expect its strategy-level metrics to remain much closer to MAGIC, exactly because its diversity operates on text rather than on the underlying risk-by-style structure (cf.\ Section~\ref{sec:intro}).
+
+% [Figure 4 (optional) — combinatorial emergence case study] 放 sanitized 案例
+\begin{figure}[t]
+  \centering
+  \fbox{\rule[-2.0cm]{0pt}{4.0cm}\rule[-2.0cm]{0.95\linewidth}{0pt}}
+  \caption{\textbf{Combinatorial attack emergence.} Sanitized late-training rewrite produced by \method that composes multiple risk categories and attack styles in a single prompt, with explicit strategy-descriptor annotations. Full list of cases with ethical sanitization appears in Appendix~\ref{apdx:attack-patterns}.}
+  \label{fig:combinatorial}
+\end{figure}
+
+% ----------------------- RQ5 -----------------------
+\begin{rqbox}
+\textbf{RQ5:} \textit{Does the Bayesian adversarial replay pool prevent defense adversarial forgetting?}
+\end{rqbox}
+
+\begin{figure}[t]
+  \centering
+  \fbox{\rule[-2.3cm]{0pt}{4.6cm}\rule[-2.3cm]{0.95\linewidth}{0pt}}
+  \caption{\textbf{RQ5 — Forgetting curves across training.} For each defender checkpoint $t$, we evaluate ASR against attacks collected at \emph{earlier} rounds ($t{-}K$, $t{-}K/2$, $t$). Without replay, early-round ASR rebounds (adversarial forgetting); with uniform replay, rebound is partly suppressed; with \method's Bayesian Thompson replay the curve remains essentially flat. Placeholder figure.}
+  \label{fig:forgetting}
+\end{figure}
+
+% [RQ5 解读段]
+% 中文对应内容:对每个训练步的 defender checkpoint,我们复现早期/中期/近期的攻击并测量其 ASR。若没有回放,旧攻击的 ASR 会在 defender 向新策略漂移时显著反弹（呈典型 U 形)；均匀回放能部分缓解,但无法区分"早已学会"与"仍危险"的样本;DACE 的 Bayesian 回放通过 Thompson 采样 + 时间衰减使两者各得其所,曲线近似平坦,对应 §3 中 Adversarial Forgetting 形式化下的期望行为。
+For each defender checkpoint, we evaluate against attacks drawn from three time slices of the attacker's training trajectory. Without replay, ASR on early-round attacks rebounds sharply as the defender drifts (adversarial forgetting). Uniform replay reduces the rebound but cannot distinguish ``already-neutralized'' from ``still-dangerous'' samples. \method's Bayesian Thompson replay is expected to keep the forgetting curve nearly flat, because time decay prevents stale evidence from dominating the replay mix, while Thompson sampling preserves coverage of rarely-tested but potentially still-dangerous samples.
+
+% ----------------------------------------------------------
+% 5.3 Ablation Study
+% ----------------------------------------------------------
+\subsection{Ablation Study}
+\label{sec:exp-ablation}
+
+\begin{table}[t]
+  \centering
+  \small
+  \caption{\textbf{Ablation on \method's components.} Each row removes or replaces one mechanism. Every removed component is expected to hurt at least two out of the six reporting metrics; replay-related rows mainly hurt the \textit{early-attack ASR} column (a proxy for forgetting); diversity-related rows mainly hurt \textit{Coverage} (a proxy for collapse).}
+  \label{tab:ablation}
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular}{lcccccc}
+    \toprule
+    \textbf{Variant} & \makecell{WJB\\adv ASR$\downarrow$} & \makecell{DAN\\ASR$\downarrow$} & \makecell{AutoDAN-\\Turbo ASR$\downarrow$} & \makecell{XSTest\\Comply$\uparrow$} & \makecell{Strategy\\Coverage$\uparrow$} & \makecell{Early-Attack\\ASR$\downarrow$} \\
+    \midrule
+    Full \method                             & -- & -- & -- & -- & -- & -- \\
+    \ \ w/o coverage reward ($R_{\mathrm{div}}$) & -- & -- & -- & -- & -- & -- \\
+    \ \ w/o SFT warm start                    & -- & -- & -- & -- & -- & -- \\
+    \ \ w/o replay pool                       & -- & -- & -- & -- & -- & -- \\
+    \ \ replay: uniform (no Thompson)         & -- & -- & -- & -- & -- & -- \\
+    \ \ replay: discrete score (SSP-style)    & -- & -- & -- & -- & -- & -- \\
+    \ \ diversity: novelty (vs.\ coverage)    & -- & -- & -- & -- & -- & -- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% [Ablation 解读段] 大意:对每一行给出"去掉它损失哪些列"的预期归因,把每个组件和它直接修复的病态对齐。
+% 中文对应内容:消融研究的预期结构性结论:去掉覆盖奖励主要打击策略覆盖率和强对抗 ASR;去掉 SFT 热启动主要打击 attacker 遵守格式与冷启动覆盖;去掉回放池主要让 early-attack ASR 反弹（对应对抗遗忘）；把 Thompson 换为均匀采样使得 early-attack ASR 仅部分缓解;把连续后验换为离散 safety score（模拟 SSP)使回放样本淘汰更不稳健;把归一化覆盖增益换为纯 novelty（例如 CRT 风格）则仍能提升策略覆盖但反复出现 reward-vanishing,整体 gain 明显变弱。
+Each ablation is expected to isolate one pathology. Removing the coverage reward mainly hurts \emph{Strategy Coverage} and, downstream, adversarial ASR on strong attackers---collapse resurfaces. Removing the replay pool mainly hurts \emph{Early-Attack ASR}---forgetting resurfaces. Replacing Thompson sampling with uniform replay partially recovers the forgetting column but wastes capacity on already-neutralized samples. Replacing the continuous Beta--Bernoulli posterior with a discrete SSP-style score (while keeping the same replay schedule) degrades forgetting mitigation due to over-sensitive one-shot pruning. Replacing the normalized marginal coverage gain with a raw novelty reward preserves some diversity but exhibits the reward-vanishing signature that normalized coverage is designed to eliminate.
+
+% ----------------------------------------------------------
+% 5.4 Cross-Evaluation (Optional — dropped to appendix if space forces)
+% ----------------------------------------------------------
+\subsection{Co-Evolution Dynamics}
+\label{sec:exp-coevolve}
+
+\begin{figure}[t]
+  \centering
+  \fbox{\rule[-2.3cm]{0pt}{4.6cm}\rule[-2.3cm]{0.95\linewidth}{0pt}}
+  \caption{\textbf{Cross-evaluation matrix} of attacker and defender checkpoints over training rounds. Cell $(i,j)$ reports ASR of attacker checkpoint $A_i$ against defender checkpoint $D_j$. The monotonically decreasing diagonal and the low upper-right block are the signature of healthy co-evolution (both sides improve) without an OOD attacker rebound. Placeholder figure.}
+  \label{fig:coevolution-matrix}
+\end{figure}
+
+% [Co-evolution 解读段]
+% 中文对应内容:我们在每轮训练后保存 attacker 与 defender 的 checkpoint,并两两交叉评估生成 5×5 网格。若协同演化健康,则对角线上 ASR 单调下降（双方均在进步),且右上方（较新 attacker × 较旧 defender)的 ASR 显著高于左下方（较旧 attacker × 较新 defender),后者应稳定在低位——这正是"无 OOD 攻击反弹"的证据。我们把这一矩阵视为 DACE 协同演化健康性的"视觉指纹"。
+We view the cross-evaluation matrix as the \emph{visual signature} of healthy co-evolution: a monotonically decreasing main diagonal (both sides improve) together with a cold lower-left block (older attackers are reliably refused by newer defenders) and a consistently hot upper-right block (newer attackers still pressure older defenders). \method is expected to exhibit this pattern without the OOD rebound occasionally observed in non-memorized co-evolution baselines.

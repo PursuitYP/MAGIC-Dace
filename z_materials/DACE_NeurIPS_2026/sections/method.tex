@@ -1,0 +1,208 @@
+% ==========================================================
+% == Section 4: Method                                     ==
+% ==========================================================
+\section{Method}
+\label{sec:method}
+
+% [Section 4 overview paragraph] 大意:用一段引子交代 DACE 方法章节的组织结构,呼应 §3 的两大病态。
+% 撰写逻辑:承接 §3 提出的 Strategy Collapse 和 Adversarial Forgetting,提示 DACE 通过"显式策略空间 + 归一化覆盖奖励"解决前者,通过"Beta-Bernoulli 贝叶斯回放"解决后者;随后给出本章子节结构（4.1 overview、4.2 策略空间、4.3 attacker 奖励、4.4 defender 回放、4.5 simplified algorithm)。
+% 中文对应内容:本章详细描述 DACE 框架。针对 §3 提出的两大病态,DACE 的方法可以分成两条相对独立但在训练中紧密耦合的链条:攻击者一侧通过显式的 12×10 策略空间与归一化边际覆盖增益奖励驱动策略层面的覆盖,从而缓解策略坍缩;防御者一侧通过统一的贝叶斯对抗回放池持续维持对历史攻击的拒答能力,从而缓解对抗遗忘。§4.1 给出整体流程概览,§4.2 描述策略空间,§4.3 介绍 attacker 端的多样性奖励与差异化激励,§4.4 介绍 defender 端的 Bayesian 回放机制,§4.5 给出训练主循环的精简算法框（完整版见附录 \ref{apdx:algorithm}）。
+This section presents \method. Building on the non-stationary, asymmetric-sequential game from Section~\ref{sec:preliminaries}, \method addresses the two pathologies along two largely decoupled but tightly co-trained mechanisms: the \emph{attacker side} uses an explicit $12\times10$ strategy space together with a normalized marginal coverage gain reward to fight strategy collapse (\S\ref{sec:method-space}, \S\ref{sec:method-attacker}); the \emph{defender side} maintains a unified Bayesian adversarial replay pool to fight adversarial forgetting (\S\ref{sec:method-replay}). The two sides interact through a single shared archive, which simultaneously records strategy frequencies and threat posteriors. Section~\ref{sec:method-algo} gives a simplified training algorithm; the full pseudocode with hyperparameters is deferred to Appendix~\ref{apdx:algorithm}.
+
+% ----------------------------------------------------------
+% 4.1 Overview + Figure 2
+% ----------------------------------------------------------
+\subsection{Framework Overview}
+\label{sec:method-overview}
+
+% [Figure 2] 占位:用户后续补充 DACE pipeline 图。
+% Placeholder figure — user will provide the actual PDF.
+\begin{figure}[t]
+  \centering
+  \fbox{\rule[-2.8cm]{0pt}{5.6cm}\rule[-2.8cm]{0.95\linewidth}{0pt}}
+  \caption{\textbf{\method overall pipeline.} \textbf{Stage~1} (left): frozen defender; the attacker selects a strategy $(s,c)\in\strategyspace$ and rewrites a seed prompt, receiving a composite reward composed of an effectiveness term from the defender's response and a normalized marginal coverage gain term from the archive. Successful rewrites are pushed into the unified archive. \textbf{Unified archive} (middle): each successful attack carries a strategy descriptor $b(x)$, a Beta--Bernoulli threat posterior $(s_i,f_i)$, and both sides of the training loop consume it. \textbf{Stage~2} (right): frozen attacker; the defender trains on a mixed mini-batch of freshly generated attacks and Thompson-sampled replays, followed by per-sample posterior updates and pruning. Time decay is applied at the start of every round to track the evolving defender.}
+  \label{fig:pipeline}
+\end{figure}
+
+% [段 4.1] 大意:概述两阶段交替循环与统一档案池。每个阶段是什么在训练、被冻结的是谁、档案池在哪一步被读/写。
+% 撰写逻辑:按时间顺序介绍每一轮 (round) 的 Stage 1 → Stage 2:Stage 1 训练 attacker,成功攻击入池;Stage 2 训练 defender,训练 batch 为新攻击 + Thompson 采样回放,训练后更新 posterior 并剪枝;每轮开始前做 time decay 并把攻击成功的新样本也加入档案池。最后引用 Figure 2。
+% 中文对应内容:DACE 的训练过程由若干轮迭代组成,每轮包含两阶段。Stage 1 固定 defender,attacker 首先对每个种子 prompt 采样一个策略描述符 (s,c) 并做改写,随后 defender 一次性生成响应,由安全判官同时判定攻击是否成功、响应是否有害/合规;attacker 的复合奖励由攻击有效性、格式合规和归一化覆盖增益三部分组成,通过 GRPO 更新。Stage 2 固定 attacker,每个 defender 训练 batch 由两部分组成:针对种子 prompt 由当前 attacker 新生成的攻击（B_train 个)与从档案池通过 Thompson 采样抽取的历史攻击（B_replay 个）；混合 batch 驱动防御者同步学习"应对新攻击"与"巩固旧防御"两类目标,训练后每条回放样本按贝叶斯共轭规则更新 (s_i, f_i) 并根据阈值剪枝。每轮开始前对档案池中的 (s_i, f_i) 做一次时间衰减,以追踪 defender 的能力漂移。整个流程见 Figure \ref{fig:pipeline}。
+\method iterates a two-stage training loop; each round consists of an attacker-training stage followed by a defender-training stage, and all successful attacks live in a single archive $\archive$ that is read/written by both stages. \textbf{Stage~1} (attacker, frozen defender). For each seed prompt the attacker first samples an attack strategy $(s,c)\in\strategyspace$ and then produces a rewrite; the defender generates a single response; a safety judge returns (a) whether the attack succeeds, (b) whether the defender's response is harmful or over-refuses, and (c) the strategy descriptor extracted from the attacker's output. The attacker is updated by GRPO~\citep{shao2024grpo} using a composite reward $R_A$ that combines effectiveness, format, and a normalized marginal coverage gain (Eq.~\ref{eq:reward-A}). Every successful rewrite is inserted into $\archive$. \textbf{Stage~2} (defender, frozen attacker). Each defender mini-batch is a union of $B_{\mathrm{train}}$ freshly generated attacks and $B_{\mathrm{replay}}$ attacks drawn from $\archive$ by Thompson sampling against the Beta--Bernoulli posteriors. The defender is updated by GRPO using $R_D$; after the update, the posterior $(s_i,f_i)$ of every replayed sample is refreshed by Bayesian conjugate updates (Eq.~\ref{eq:beta-update}), and confidently neutralized entries are pruned. At the start of every round, time decay is applied to all posteriors, $s_i\leftarrow\gamma s_i,\ f_i\leftarrow\gamma f_i$, so that threat estimates track the evolving defender. Figure~\ref{fig:pipeline} summarizes this pipeline.
+
+% ----------------------------------------------------------
+% 4.2 Explicit Attack Strategy Space
+% ----------------------------------------------------------
+\subsection{Explicit Attack Strategy Space}
+\label{sec:method-space}
+
+% [段 4.2.1 · 策略空间定义] 大意:给出策略空间的数学定义与来源,强调 12×10 的数据正当性。
+% 撰写逻辑:先写 B = S × C 定义;再说 S 来自 Llama-Guard-4 12 类（去掉两类)、C 来自 Rainbow Teaming 10 风格;最后指明策略描述符 b(x) 的确切含义。
+% 中文对应内容:我们把攻击空间显式结构化为二维离散网格 B = S × C,其中 S 是安全风险类别,C 是攻击风格。具体地,S 取自 Llama-Guard-4 官方分类的 12 类(我们从原 14 类中剪掉 Sexual Content 与 Code Interpreter Abuse 两项:前者在 benign prompt 上被判为 unsafe 的比例高达 96.3% 不可靠,后者概念上不适用于纯文本防御器,详细剪裁证据见附录 \ref{apdx:space-design})；C 取自 Rainbow Teaming 的 10 种攻击风格（Slang / Technical Terms / Role Play / Authority Manipulation / Misspellings / Word Play / Emotional Manipulation / Hypotheticals / Historical Scenario / Uncommon Dialects）。总策略槽位数为 |S|·|C| = 12·10 = 120。每条攻击 x 被映射到一个策略描述符 b(x)=(s,c) ∈ B。
+We formalize the attacker's action space along two interpretable axes:
+\begin{equation}
+  \strategyspace \;=\; \riskspace \times \stylespace, \qquad
+  |\riskspace|=12,\ \ |\stylespace|=10,\ \ |\strategyspace|=120.
+\end{equation}
+The risk-category axis $\riskspace$ is inherited from the public Llama-Guard-4 safety taxonomy~\citep{llamaguard4_2026}. We remove two of its $14$ original categories: \textit{Sexual Content}, whose benign prompts are judged as non-safe with a $96.3\%$ false-positive rate by Llama-Guard-4 itself (making the diversity signal unreliable in that row), and \textit{Code Interpreter Abuse}, which presupposes tool-execution surfaces absent from our text-only defender. Empirical evidence for this pruning, and a full map of the retained $12$ risk categories to Llama-Guard-4 codes (S1--S11 and S13), is given in Appendix~\ref{apdx:space-design}. The style axis $\stylespace$ is adapted from Rainbow Teaming~\citep{samvelyan2024rainbow} and consists of ten well-studied linguistic attack patterns (\textit{Slang}, \textit{Technical Terms}, \textit{Role Play}, \textit{Authority Manipulation}, \textit{Misspellings}, \textit{Word Play}, \textit{Emotional Manipulation}, \textit{Hypotheticals}, \textit{Historical Scenario}, \textit{Uncommon Dialects}). Every attack $x$ is mapped to its strategy descriptor $b(x)=(s,c)\in\strategyspace$.
+
+% [段 4.2.2 · 策略条件生成] 大意:描述 attacker 的三段式输出结构,以及描述符的正则提取,强调我们不依赖额外 LLM judge 来识别策略。
+% 撰写逻辑:先说在 system prompt 中给 attacker 提供完整策略空间描述 + 要求产出 <think>/<strategy>/<answer> 三段;再说从 <strategy> 中用正则提取 (s,c);最后提 SFT 热启动以保证格式遵守率。
+% 中文对应内容:在训练和推理阶段,attacker 的输入 prompt 包含完整的 12×10 策略空间描述;模型被要求先在 <think> 中推理选择最合适的 (s,c),然后在 <strategy> 中以固定格式（"risk category: <...>\nattack style: <...>")声明所选策略,最后在 <answer> 中输出改写后的攻击 prompt。我们在 <strategy> 块上使用容错正则 + fuzzy substring 兜底提取 b(x)；这一步直接消费模型的显式声明,避免引入另一个 LLM judge 带来的噪声和循环依赖。为保证 RL 训练的格式遵从度和冷启动覆盖,我们用 Gemini-2.5-Pro 蒸馏了约 43K 条涵盖 benign 与 harmful 双源的三段式 CoT 样本对 attacker 进行 SFT 热启动（详见附录 \ref{apdx:space-design}）。
+To obtain $b(x)$ \emph{directly from the attacker's output}, we instruct the attacker via its system prompt to emit a three-part response, \texttt{<think>\dots</think>\,<strategy>\dots</strategy>\,<answer>\dots</answer>}, where the \texttt{<strategy>} block declares the chosen pair in the canonical form ``\texttt{risk category: \ldots / attack style: \ldots}''. Descriptor extraction is done by a robust regex with a fuzzy substring fallback, i.e.\ $b(x)$ is read off the attacker's own declaration rather than inferred by a separate LLM judge. This design keeps the supervision signal self-consistent (the strategy used to compute coverage is exactly the one the attacker chose) and removes a potential judge-induced circular dependency. To bootstrap format compliance and ensure SFT-stage coverage of low-frequency cells, we warm-start the attacker with a $\sim$43K-sample Gemini-2.5-Pro-distilled CoT dataset containing three-part responses over both benign and harmful seed prompts; construction details appear in Appendix~\ref{apdx:space-design}.
+
+% ----------------------------------------------------------
+% 4.3 Diversity-Aware Attacker Optimization
+% ----------------------------------------------------------
+\subsection{Diversity-Aware Attacker Optimization}
+\label{sec:method-attacker}
+
+% [段 4.3.1 · Composite reward] 大意:引入 attacker 总奖励 R_A 的三项组成。
+% 撰写逻辑:给出公式;点出 -R_D 维持零和结构;R_fmt 鼓励三段式格式;R_div 是新贡献,乘以一个差异化系数 λ(x)。
+% 中文对应内容:attacker 的复合奖励 R_A 由三部分组成:(i) 反映攻击有效性的零和项 -R_D(x, y_D),其中 y_D 是 defender 对 x 的响应,保证 attacker 和 defender 在有效性维度上严格零和;(ii) 格式奖励 R_fmt 激励三段式输出和有效策略声明;(iii) 归一化边际覆盖增益奖励 R_div(x),乘以差异化多样性系数 λ(x)(仅对成功攻击给予完整激励,失败攻击给予折减)。
+We train the attacker with a composite reward combining \emph{effectiveness}, \emph{format}, and \emph{coverage}:
+\begin{equation}
+  R_A(x) \;=\; -\,R_D(x, y_D)\ +\ R_{\mathrm{fmt}}(x)\ +\ \lambda(x)\cdot R_{\mathrm{div}}(x),
+  \label{eq:reward-A}
+\end{equation}
+where $y_D$ is the defender's response to $x$, and the zero-sum term $-R_D$ preserves the adversarial structure from the underlying asymmetric sequential game. The format term $R_{\mathrm{fmt}}$ rewards well-formed \texttt{<think><strategy><answer>} outputs whose strategy descriptor can be successfully extracted. The coverage term $R_{\mathrm{div}}$, defined next, is the core novelty of \method's attacker-side objective.
+
+% [段 4.3.2 · Normalized marginal coverage gain — 问题动机] 大意:先刻画 reward vanishing 问题,再提出归一化的方案。
+% 撰写逻辑:raw marginal entropy gain ΔH 会随 |A| 增大而衰减 O(1/|A|),后期信号趋零 → 解决:用同样 O(1/|A|) 量级的最大可能单步增益作为分母,让比值稳定在 O(1)。
+% 中文对应内容:一个最朴素的做法是把加入 x 后档案池策略分布的 Shannon 熵增量作为奖励 R_raw = H(p_{A ∪ {x}}) - H(p_A)。但我们观察到这一信号存在明显的 reward vanishing:当 |A| 很大时,单样本对全局分布的扰动量级仅为 O(1/|A|),对应的熵变化同阶,使 RL 训练后期信号几乎为零。为了修复这一问题,我们对 R_raw 使用当前档案池状态下"任意单样本可达到的最大边际增益"作为归一化基准。
+Computing diversity at the \emph{strategy level} is attractive but faces a subtle issue: a raw marginal entropy gain decays as the archive grows. Concretely, let $\archivedist$ be the empirical distribution of strategy descriptors in $\archive$ and $H(\cdot)$ the Shannon entropy. The raw coverage signal
+\begin{equation}
+  R_{\mathrm{raw}}(x) \;=\; H(\mathbf{p}_{\archive\cup\{x\}})\ -\ H(\archivedist)
+\end{equation}
+is of order $\mathcal{O}(1/|\archive|)$: a single sample can only shift the empirical distribution by $1/|\archive|$ in some coordinate, so both $R_{\mathrm{raw}}$ and the relative differences between samples collapse to zero as training progresses---a textbook reward-vanishing regime that is particularly hostile to GRPO's group-relative advantage.
+
+% [段 4.3.3 · Normalized marginal coverage gain — 定义 + 性质] 大意:给出归一化定义,说明分母计算效率与整体量级稳定。
+% 撰写逻辑:分母为 max_b[加入落入 b 的假想样本后熵增益] + ε,遍历 |B| 个槽位;batch 内共享分母；O(|B|) 开销可接受;归一化结果 ∈ [−?, 1],落入当前最稀槽位得 1,落入过度饱和槽位得 < 0。
+% 中文对应内容:我们定义 DACE 的归一化边际覆盖增益为
+% R_div(x) = [H(p_{A∪{x}}) - H(p_A)] / [max_{b ∈ B}(H(p_{A∪{x_b}}) - H(p_A)) + ε],
+% 其中 x_b 是落入槽位 b 的假想样本。分子和分母都是 O(1/|A|) 量级同速衰减,比值始终在 O(1)。计算上,分母只依赖当前档案池状态,batch 内所有样本共享同一个值,复杂度为 O(|B|) = O(120),完全可接受。落入当前最稀疏槽位的样本 R_div = 1,落入过度饱和槽位的样本 R_div 可为负（在我们的实验中对负值使用可选的 clip_negative 开关,详见附录 C）。
+We therefore normalize by the best single-sample entropy gain achievable in the current archive state:
+\begin{equation}
+  R_{\mathrm{div}}(x) \;=\;
+  \frac{\,H(\mathbf{p}_{\archive\cup\{x\}})\ -\ H(\archivedist)\,}
+       {\displaystyle\max_{b\in\strategyspace}\!\bigl[H(\mathbf{p}_{\archive\cup\{x_b\}})-H(\archivedist)\bigr]\;+\;\varepsilon},
+  \label{eq:coverage-gain}
+\end{equation}
+where $x_b$ denotes a hypothetical sample whose strategy descriptor falls into cell $b$, and $\varepsilon>0$ is a small stabilizer. Both numerator and denominator are $\mathcal{O}(1/|\archive|)$ and decay \emph{at the same rate}, so the ratio remains $\mathcal{O}(1)$ throughout training. A sample landing in the currently sparsest cell earns $R_{\mathrm{div}}=1$; a sample landing in an over-saturated cell is pushed toward or below zero, providing a strong, \emph{signed} gradient that continues to discriminate strategy choices even in late training. Computationally, the denominator depends only on the current archive state and is shared across the mini-batch, so the per-batch overhead is a single $\mathcal{O}(|\strategyspace|)=\mathcal{O}(120)$ sweep over cells.
+
+% [段 4.3.4 · KL perspective] 大意:提供理论解读 - 归一化覆盖增益就是单步 KL 收缩效率,且具 zero-avoiding 性质。
+% 撰写逻辑:利用恒等式 H(p) = log|B| - D_KL(p‖u);直接把覆盖增益改写为 KL 散度减少量;解释 KL 对低频槽位的偏导数最大 → 选择低频槽位 = 选择 KL 最速下降方向;再讲前向 KL 的 zero-avoiding 性质 → 空白槽位得到最强驱动;总结为"单步 KL 收缩效率"这一干净语义。
+% 中文对应内容:利用恒等式 H(p) = log|B| − D_KL(p‖u)（其中 u 为 B 上的均匀分布),边际熵增量等价于 KL 散度的减少量:
+% H(p_{A∪{x}}) - H(p_A) = D_KL(p_A‖u) - D_KL(p_{A∪{x}}‖u)。
+% 因此 R_div(x) 就是"该样本使策略分布向均匀分布收缩的 KL 减少量"占"单步最优 KL 减少量"的比例。这一 KL 视角带来两个理论支撑:(a) KL 对第 b 个槽位概率的负梯度在 p_b 较小时最大,因此落入低频槽位等价于选择 KL 最速下降方向;(b) 前向 KL 具有 zero-avoiding 性质,当 p_b → 0 时发散,所以空白槽位自然获得最强的探索驱动,与覆盖度目标完全一致。归一化覆盖增益因此拥有干净的信息论解读——单步 KL 收缩效率。
+\paragraph{A KL-contraction interpretation.} Let $\uniform$ be the uniform distribution over $\strategyspace$. Using $H(\mathbf{p})=\log|\strategyspace|-\KL(\mathbf{p}\|\uniform)$, the marginal entropy gain rewrites as
+\begin{equation}
+  H(\mathbf{p}_{\archive\cup\{x\}})\ -\ H(\archivedist)
+  \;=\; \KL(\archivedist\,\|\,\uniform)\ -\ \KL(\mathbf{p}_{\archive\cup\{x\}}\,\|\,\uniform),
+\end{equation}
+so $R_{\mathrm{div}}(x)$ is exactly the \emph{fraction of single-step KL contraction} (toward the uniform strategy prior) that sample $x$ achieves relative to the best possible sample at the current archive state. Two consequences justify the design: (i)~the partial derivative $\partial \KL(\mathbf{p}\|\uniform)/\partial p_b=1+\log p_b-\log u_b$ is most negative for small $p_b$, i.e.\ low-frequency cells coincide with the steepest KL-descent direction; (ii)~the forward KL is zero-avoiding, so empty cells ($p_b\to 0$) exert the \emph{strongest} pull, aligning the reward with the coverage objective of never leaving a strategy region unexplored.
+
+% [段 4.3.5 · Differentiated diversity coefficient] 大意:引入 λ(x) 差异化激励,防止"形式上多样但无效"的探索。
+% 撰写逻辑:说明 λ(x) 为 1.0/0.5 的动机;强调为何不用 λ=0 for failures（会完全丢失冷门策略方向的探索梯度）;说明效果:与 GRPO 的 group 归一化天然兼容,在 group 内把"有效+多样"的样本放到 advantage 的最高。
+% 中文对应内容:为了避免"形式上多样但实际无效"的冗余攻击,我们引入差异化多样性系数
+% λ(x) = 1.0 若攻击成功,否则 0.5。
+% 对于攻击失败的样本我们不直接把 R_div 屏蔽为 0,因为那会让冷门策略方向在"暂未学会有效攻击"时彻底丧失探索信号;相反,把它折减到 0.5 既减弱对无效攻击的激励,又保留对结构化广度的探索梯度。由于 λ_success = 2 λ_fail,在 GRPO 的组内 advantage 计算中,"既有效又多样"的样本会获得显著更高的综合优势,梯度更新自然偏向这一类样本。
+To avoid rewarding attacks that are \emph{formally} diverse but \emph{practically} ineffective, we gate $R_{\mathrm{div}}$ by a success-aware coefficient:
+\begin{equation}
+  \lambda(x) \;=\;
+  \begin{cases} 1.0 & \text{if } x \text{ succeeds (i.e.\ defender's response is unsafe)}, \\[2pt]
+                0.5 & \text{otherwise}.
+  \end{cases}
+  \label{eq:lambda}
+\end{equation}
+Setting the coefficient to $0$ on failures turned out to be too aggressive: strategy cells that are hard to crack early in training lose their exploration gradient entirely and are \emph{de facto} abandoned. A half-weight $\lambda=0.5$ retains a strictly positive exploration pressure toward under-exercised regions while keeping successful rewrites twice as attractive as unsuccessful ones. Under GRPO's group-relative advantage, the $2\!:\!1$ ratio naturally promotes samples that are \emph{simultaneously effective and diverse} to the top of each group, which is the combination we want to reinforce.
+
+% ----------------------------------------------------------
+% 4.4 Bayesian Adversarial Replay
+% ----------------------------------------------------------
+\subsection{Bayesian Adversarial Replay for Defender}
+\label{sec:method-replay}
+
+% [段 4.4.1 · Unified archive] 大意:介绍 unified archive 的数据结构和双重职责。
+% 撰写逻辑:一句话 A 既承担策略频次（覆盖奖励用)又承担回放池（defender 训练用);每个条目维护 prompt、(s,c)、(s_i, f_i) 四元组；入池时机 = attacker 或 defender 两阶段结束时各 flush 一次成功样本。
+% 中文对应内容:我们让档案池 A 承担两重职责:对 attacker 端,A 记录各策略槽位的累计频次,为 §4.3 的归一化覆盖增益计算提供分母依据;对 defender 端,A 提供历史攻击样本以混入训练。每个档案条目形式为 (prompt x, 描述符 b(x)=(s,c), 后验计数 (s_i, f_i))；我们在两阶段结束时分别将本阶段攻击成功的新样本加入 A,以保证两端都有机会贡献新条目。
+We couple the attacker-side coverage reward and the defender-side replay mechanism through a single \emph{unified archive} $\archive$. Each entry stores the attack prompt $x_i$, its strategy descriptor $b(x_i)$ (for updating $\archivedist$), and two non-negative real counts $(s_i,f_i)$ that parameterize a threat posterior. Newly successful attacks are flushed into $\archive$ at the end of both stages, so the archive is continuously supplied from both the attacker-training and the defender-training phases.
+
+% [段 4.4.2 · Beta-Bernoulli posterior] 大意:引入 Beta-Bernoulli 后验,定义 p_i,给出均值/方差公式,强调与 SSP 离散更新的结构性差别。
+% 撰写逻辑:每条攻击成败假设为 Bernoulli,取 Beta 共轭先验,后验立刻是 Beta(α + s_i, β + f_i);给均值和方差公式;强调均值（利用)和方差（探索)这两件事一次性建模;并点出 vs SSP 三个维度:(i) 聚合所有历史试验（非单次覆写）；(ii) 方差表达不确定性;(iii) 支持时间衰减（下一段)。
+% 中文对应内容:把每次回放中"攻击是否突破 defender"视作伯努利试验,则 Beta 分布是其共轭先验,后验为 Beta(α + s_i, β + f_i)（典型地 α = β = 1 即均匀先验）。由此样本 i 的当前攻击成功率后验均值为 p̂_i = (α + s_i) / (α + β + s_i + f_i),后验方差为 Var(p_i) = (α + s_i)(β + f_i)/{[(α + β + s_i + f_i)^2 (α + β + s_i + f_i + 1)]}。相比 SSP 的离散 safety score 累计,这一后验同时表达(i)"利用"所需的点估计和(ii)"探索"所需的不确定性;后者对试验次数稀少的样本尤为关键。
+\paragraph{Threat posterior.} For each entry, we treat its success/failure history as i.i.d.\ Bernoulli trials of a latent threat probability $p_i$ and take the conjugate Beta prior with pseudo-counts $\alpha,\beta>0$ (we use $\alpha=\beta=1$, i.e.\ a uniform prior). The posterior then has the closed form
+\begin{equation}
+  p_i\mid s_i,f_i \;\sim\; \mathrm{Beta}(\alpha+s_i,\,\beta+f_i),\quad
+  \hat p_i \;=\; \frac{\alpha+s_i}{\alpha+\beta+s_i+f_i},\quad
+  \mathrm{Var}(p_i)\ \downarrow\ \text{as trials grow.}
+  \label{eq:posterior}
+\end{equation}
+Each replay round updates the posterior by the standard Beta--Bernoulli conjugate step,
+\begin{equation}
+  s_i \leftarrow s_i+1 \ \text{(attack broke through)},\qquad
+  f_i \leftarrow f_i+1 \ \text{(attack refused)}.
+  \label{eq:beta-update}
+\end{equation}
+This replaces SSP's discrete safety-score accumulation with a principled continuous estimator and directly addresses the three limitations raised in Section~\ref{sec:intro}: the posterior \emph{mean} integrates all historical trials (rather than being overwritten by the most recent score); the posterior \emph{variance} exposes estimation uncertainty (trials-poor samples are flagged, rather than treated identically to trials-rich ones); and, as described next, the Bayesian form admits a natural forgetting mechanism.
+
+% [段 4.4.3 · Time decay] 大意:引入指数时间衰减机制以处理 defender 的非平稳性。
+% 撰写逻辑:每轮开始 s_i ← γ s_i, f_i ← γ f_i (γ ∈ [0.9, 0.99]);解释效果:慢慢把 (s_i, f_i) 拉回先验,使 posterior 跟随 defender 能力漂移;指出 s_i, f_i 会变成非整数（Beta 接受任意正实数,数学合法）。
+% 中文对应内容:由于 defender 在持续训练,过去的成败试验未必反映其当前能力。我们在每轮训练开始时对档案池中所有条目执行指数时间衰减 s_i ← γ s_i, f_i ← γ f_i（γ ∈ [0.9, 0.99] 典型值）,相当于把旧的证据缓慢地"遗忘"回先验。由于 Beta 分布允许任意正实数参数,时间衰减后非整数的 s_i, f_i 完全合法。这一机制让 p̂_i 自然地追随 defender 当前的能力水平,避免早期的静态估计持续污染后期的决策。
+\paragraph{Time decay for non-stationarity.} Because the defender is continuously trained, older evidence is less informative about the current threat landscape. At the start of every round we apply an exponential decay to all archive entries:
+\begin{equation}
+  s_i \leftarrow \gamma\,s_i,\qquad f_i \leftarrow \gamma\,f_i,\qquad \gamma \in [0.9,\,0.99].
+  \label{eq:time-decay}
+\end{equation}
+Mechanistically, this pulls $(s_i,f_i)$ back toward the prior at a geometric rate, so posterior means re-approach $1/2$ unless reinforced by new evidence and posterior variances re-expand to reflect the loss of confidence. Because the Beta distribution is defined for arbitrary positive real parameters, the non-integer $(s_i,f_i)$ produced by decay are mathematically well-defined, and the same conjugate update (Eq.~\ref{eq:beta-update}) applies in subsequent rounds.
+
+% [段 4.4.4 · Thompson sampling] 大意:引入 Thompson Sampling 作为回放采样策略,自然实现 explore-exploit 平衡。
+% 撰写逻辑:每次需要从 A 抽 B_replay 条时,对每个条目独立采样 p̃_i ~ Beta(α+s_i, β+f_i),按 p̃_i 降序取 top-B_replay;直观解释:后验均值高+方差小的样本（稳定高危）大概率抽到高 p̃_i → exploit;试验次数少、方差大的样本也有机会抽到高值 → explore;无需额外超参。
+% 中文对应内容:每当 defender 训练需要从 A 中抽 B_replay 条样本时,我们使用 Thompson Sampling:对每个条目独立从其后验分布采样一次 p̃_i ~ Beta(α+s_i, β+f_i),按 p̃_i 降序选出前 B_replay 个。后验均值高且方差小的样本（已被多次验证的稳定高危攻击）倾向于抽到接近均值的高值,得到"利用";试验次数少、方差大的样本偶尔也会抽到高值,得到"探索"。Thompson 采样因此自然实现了 explore-exploit 平衡,且不引入任何额外调参。
+\paragraph{Thompson sampling for replay.} When a defender mini-batch requires $B_{\mathrm{replay}}$ historical attacks, we draw a single posterior sample per entry and take the top-$B_{\mathrm{replay}}$ by its value:
+\begin{equation}
+  \tilde p_i \;\sim\; \mathrm{Beta}(\alpha+s_i,\,\beta+f_i),\qquad
+  \mathcal{D}_{\mathrm{replay}} \;=\; \operatorname*{Top-}B_{\mathrm{replay}}\bigl(\{\tilde p_i\}\bigr).
+  \label{eq:thompson}
+\end{equation}
+Samples with high posterior mean and low variance (i.e.\ repeatedly verified threats) concentrate around their mean and are picked reliably (\emph{exploit}); samples with high variance (few trials) occasionally draw high values and are re-examined (\emph{explore}). Thompson sampling thus induces a parameter-free exploration--exploitation trade-off, and it degenerates gracefully: as the archive stabilizes, variance shrinks and the procedure approaches greedy top-$B_{\mathrm{replay}}$ selection over $\hat p_i$.
+
+% [段 4.4.5 · Pruning] 大意:补充剪枝规则,防止档案池过度增长 + 淘汰已被彻底攻克的攻击。
+% 撰写逻辑:当 p̂_i < ε 且 s_i + f_i > n_min（已充分测试)时,移除条目。
+% 中文对应内容:最后我们对被充分测试且后验均值已极低的条目执行剪枝,即若 p̂_i < ε 且 s_i + f_i > n_min 则将其从 A 中移除。充分测试（n_min)保证低不确定性的条目不会被过早淘汰,后验均值阈值（ε)保证仅当攻击真的已被 defender 掌握时才清除。具体阈值见附录 \ref{apdx:training-setup}。
+Finally, to bound the archive size and purge attacks that the defender has genuinely learned to refuse, we prune:
+\begin{equation}
+  \text{remove } x_i \iff \hat p_i < \epsilon \ \text{and}\ (s_i+f_i) > n_{\min}.
+  \label{eq:prune}
+\end{equation}
+The $n_{\min}$ threshold ensures that low-trial, high-variance entries are never pruned prematurely; the $\hat p_i<\epsilon$ threshold ensures that we only purge attacks whose \emph{expected} threat, not merely a single lucky refusal, is below the tolerance. Concrete hyperparameter values are reported in Appendix~\ref{apdx:training-setup}.
+
+% ----------------------------------------------------------
+% 4.5 Training Algorithm (Simplified)
+% ----------------------------------------------------------
+\subsection{Training Algorithm}
+\label{sec:method-algo}
+
+% [段 4.5] 大意:给出 main loop 精简伪代码（10-15 行）；强调完整算法 + 超参 + 边界在附录。
+% 撰写逻辑:用 algorithm 环境列出两阶段循环骨架,每一行对应一个关键操作;末尾引用附录 A.1 的完整伪代码。
+% 中文对应内容:算法 1 给出 DACE 的训练主循环精简版（便于 main text 呈现整体结构）。完整带有类型声明、数据结构、超参、剪枝与回放阈值的多页伪代码,以及与 v3.1 实现一一对应的逐行注释,见附录 \ref{apdx:algorithm}。
+Algorithm~\ref{alg:dace-short} summarizes the training loop of \method in the simplified form used in this section. The full pseudocode (with explicit hyperparameters, buffer semantics, and line-level correspondence to the reference implementation) appears in Appendix~\ref{apdx:algorithm}.
+
+\begin{algorithm}[t]
+  \caption{\method training loop (simplified)}
+  \label{alg:dace-short}
+  \begin{algorithmic}[1]
+    \State \textbf{Input:} attacker $\piA$, defender $\piD$, archive $\archive\leftarrow\emptyset$, rounds $K$, batch sizes $B_{\mathrm{train}},B_{\mathrm{replay}}$, decay $\gamma$
+    \For{$k=1,\dots,K$}
+      \State $(s_i,f_i)\leftarrow(\gamma s_i,\gamma f_i)$ for all $x_i\in\archive$ \Comment{time decay (Eq.~\ref{eq:time-decay})}
+      \Statex \hspace*{-1.2em}\textit{\small \# Stage 1: attacker RL (frozen $\piD$)}
+      \State Sample a batch of seed prompts; attacker emits $\langle\texttt{think},\texttt{strategy},\texttt{answer}\rangle$
+      \State Compute $b(x)$, effectiveness via $\piD$, and coverage gain $R_{\mathrm{div}}$ (Eq.~\ref{eq:coverage-gain})
+      \State Update $\piA$ by GRPO using $R_A$ with $\lambda(x)$ (Eqs.~\ref{eq:reward-A},\ref{eq:lambda}); push successes to $\archive$
+      \Statex \hspace*{-1.2em}\textit{\small \# Stage 2: defender RL (frozen $\piA$), mixed batch}
+      \State Sample $B_{\mathrm{train}}$ fresh attacks; draw $B_{\mathrm{replay}}$ replays by Thompson sampling (Eq.~\ref{eq:thompson})
+      \State Update $\piD$ by GRPO using $R_D$ on the mixed batch
+      \State Update posteriors $(s_i,f_i)$ for replayed entries (Eq.~\ref{eq:beta-update}); prune per Eq.~\ref{eq:prune}; push new successes to $\archive$
+    \EndFor
+    \State \Return $\piA,\piD,\archive$
+  \end{algorithmic}
+\end{algorithm}

@@ -31,8 +31,8 @@ IMPORTANT, please:
 
 \item {\bf Claims}
     \item[] Question: Do the main claims made in the abstract and introduction accurately reflect the paper's contributions and scope?
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The Abstract and Section~\ref{sec:intro} state three contributions---problem framing (the two pathologies), method (strategy-space coverage reward and Bayesian replay), and empirical validation---which are formalized in Section~\ref{sec:preliminaries}, operationalized in Section~\ref{sec:method}, and tested in Section~\ref{sec:experiments}.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the abstract and introduction do not include the claims made in the paper.
@@ -43,8 +43,8 @@ IMPORTANT, please:
 
 \item {\bf Limitations}
     \item[] Question: Does the paper discuss the limitations of the work performed by the authors?
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: Limitations are summarized in Section~\ref{sec:conclusion} (\emph{Limitations} paragraph) and expanded in Appendix~\ref{apdx:limitations}, covering strategy-space discretization, judge-bias amplification risk, and the text-only single-turn evaluation scope.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper has no limitation while the answer \answerNo{} means that the paper has limitations, but those are not discussed in the paper. 
@@ -59,8 +59,8 @@ IMPORTANT, please:
 
 \item {\bf Theory assumptions and proofs}
     \item[] Question: For each theoretical result, does the paper provide the full set of assumptions and a complete (and correct) proof?
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Answer: \answerNA{}
+    \item[] Justification: The paper's contributions are methodological and empirical. The subgame-perfect equilibrium result is inherited from prior work (MAGIC, cited in Section~\ref{sec:preliminaries}) without re-derivation, and Definitions~\ref{def:collapse}--\ref{def:forgetting} are descriptive formalizations of training-dynamics pathologies rather than theorems requiring proof.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not include theoretical results. 
@@ -73,8 +73,8 @@ IMPORTANT, please:
 
     \item {\bf Experimental result reproducibility}
     \item[] Question: Does the paper fully disclose all the information needed to reproduce the main experimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper (regardless of whether the code and data are provided or not)?
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: Section~\ref{sec:method} specifies the full algorithm; Appendix~\ref{apdx:algorithm} provides the complete pseudocode with hyperparameters; Section~\ref{sec:exp-setup} and Appendices~\ref{apdx:training-setup} and~\ref{apdx:bench-protocol} describe training procedures, seeds, compute, benchmark protocols, and judge configurations.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not include experiments.
@@ -93,8 +93,8 @@ IMPORTANT, please:
 
 \item {\bf Open access to data and code}
     \item[] Question: Does the paper provide open access to the data and code, with sufficient instructions to faithfully reproduce the main experimental results, as described in supplemental material?
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: We release the defender training code, Bayesian replay implementation, evaluation scripts, and an ethically sanitized strategy-indexed archive. As detailed in Appendix~\ref{apdx:limitations}, attacker weights and un-sanitized archives are withheld for safety; access to the latter is gated by a non-misuse agreement.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that paper does not include experiments requiring code.
@@ -110,8 +110,8 @@ IMPORTANT, please:
 
 \item {\bf Experimental setting/details}
     \item[] Question: Does the paper specify all the training and test details (e.g., data splits, hyperparameters, how they were chosen, type of optimizer) necessary to understand the results?
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: Training and test details are in Section~\ref{sec:exp-setup}; full hyperparameter tables and code-path mappings appear in Appendix~\ref{apdx:training-setup} (Table~\ref{tab:hyperparams}); benchmark-specific protocols are in Appendix~\ref{apdx:bench-protocol}.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not include experiments.
@@ -121,8 +121,8 @@ IMPORTANT, please:
 
 \item {\bf Experiment statistical significance}
     \item[] Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments?
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: All main-table numbers are reported as the mean across three independent training seeds, with per-seed standard deviations tabulated in Appendix~\ref{apdx:expanded-results}; factor of variability is co-evolution seed, and error estimates are computed in closed form (sample standard deviation).
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not include experiments.
@@ -138,8 +138,8 @@ IMPORTANT, please:
 
 \item {\bf Experiments compute resources}
     \item[] Question: For each experiment, does the paper provide sufficient information on the computer resources (type of compute workers, memory, time of execution) needed to reproduce the experiments?
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: Appendix~\ref{apdx:training-setup} reports the compute environment (an $8\times$H100 node), the RL framework (veRL), per-round wall-clock time, and the total compute budget including exploratory runs.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not include experiments.
@@ -150,8 +150,8 @@ IMPORTANT, please:
     
 \item {\bf Code of ethics}
     \item[] Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics \url{https://neurips.cc/public/EthicsGuidelines}?
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The authors have reviewed the NeurIPS Code of Ethics. All experiments use public benchmarks and synthetic prompts; attacker artifacts are released under gated, sanitized conditions as detailed in Appendix~\ref{apdx:limitations}; anonymity is preserved throughout.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the authors have not reviewed the NeurIPS Code of Ethics.
@@ -162,8 +162,8 @@ IMPORTANT, please:
 
 \item {\bf Broader impacts}
     \item[] Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed?
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: Appendix~\ref{apdx:limitations} (\emph{Broader impact and safeguards}) discusses both the positive impact (more robust, auditable safety alignment; explicit strategy-indexed archives for community analysis) and the negative potential (diverse adversarial rewrites that could be misused), together with the safeguards we adopt.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that there is no societal impact of the work performed.
@@ -176,8 +176,8 @@ IMPORTANT, please:
     
 \item {\bf Safeguards}
     \item[] Question: Does the paper describe safeguards that have been put in place for responsible release of data or models that have a high risk for misuse (e.g., pre-trained language models, image generators, or scraped datasets)?
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: Safeguards are described in Appendix~\ref{apdx:limitations}: we withhold the attacker weights from the public release, sanitize the released adversarial archive to remove operational details, and gate access to the un-sanitized archive behind a non-misuse agreement.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper poses no such risks.
@@ -188,8 +188,8 @@ IMPORTANT, please:
 
 \item {\bf Licenses for existing assets}
     \item[] Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected?
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: All external models (Qwen2.5, Llama3.1, Gemini-2.5-Pro, Llama-Guard-4, Qwen3Guard), benchmarks (WildGuard, HarmBench, XSTest, OR-Bench, StrongREJECT, Sorry-Bench, WildJailbreak, AlpacaEval~2), and code frameworks (veRL, GRPO, Rainbow Teaming) are cited in Section~\ref{sec:exp-setup} and Appendix~\ref{apdx:bench-protocol}; licenses and versions are documented in the code release and respected throughout.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not use existing assets.
@@ -204,8 +204,8 @@ IMPORTANT, please:
 
 \item {\bf New assets}
     \item[] Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets?
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Answer: \answerYes{}
+    \item[] Justification: The released defender model, training code, and sanitized strategy-indexed archive are accompanied by the paper (Section~\ref{sec:method}, Appendices~\ref{apdx:algorithm}--\ref{apdx:bench-protocol}), along with documentation cards describing training data, risks, and intended use. All released artifacts are anonymized at submission time.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not release new assets.
@@ -215,9 +215,9 @@ IMPORTANT, please:
     \end{itemize}
 
 \item {\bf Crowdsourcing and research with human subjects}
-    \item[] Question: For crowdsourcing experiments and research with human subjects, does the paper include the full text of instructions given to participants and screenshots, if applicable, as well as details about compensation (if any)? 
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Question: For crowdsourcing experiments and research with human subjects, does the paper include the full text of instructions given to participants and screenshots, if applicable, as well as details about compensation (if any)?
+    \item[] Answer: \answerNA{}
+    \item[] Justification: The paper does not involve crowdsourcing or research with human subjects; all attack/defense rewrites are machine-generated and all evaluation is automated or model-judged.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not involve crowdsourcing nor research with human subjects.
@@ -227,8 +227,8 @@ IMPORTANT, please:
 
 \item {\bf Institutional review board (IRB) approvals or equivalent for research with human subjects}
     \item[] Question: Does the paper describe potential risks incurred by study participants, whether such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) approvals (or an equivalent approval/review based on the requirements of your country or institution) were obtained?
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    \item[] Answer: \answerNA{}
+    \item[] Justification: The paper does not involve human subjects or crowdsourcing, so no IRB approval is required.
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the paper does not involve crowdsourcing nor research with human subjects.
@@ -239,9 +239,9 @@ IMPORTANT, please:
 
 \item {\bf Declaration of LLM usage}
     \item[] Question: Does the paper describe the usage of LLMs if it is an important, original, or non-standard component of the core methods in this research? Note that if the LLM is used only for writing, editing, or formatting purposes and does \emph{not} impact the core methodology, scientific rigor, or originality of the research, declaration is not required.
-    %this research? 
-    \item[] Answer: \answerTODO{} % Replace by \answerYes{}, \answerNo{}, or \answerNA{}.
-    \item[] Justification: \justificationTODO{}
+    %this research?
+    \item[] Answer: \answerYes{}
+    \item[] Justification: LLMs are integral to the method. Specifically: (i) the attacker warm-start SFT data is distilled from Gemini-2.5-Pro (disclosed in Section~\ref{sec:method-space} and Appendix~\ref{apdx:space-design}); (ii) the attacker and defender models are themselves LLMs (Qwen2.5, Llama3.1) trained via RL; (iii) safety judges (Qwen3Guard, GPT-4o, Llama-Guard-4) are used for training supervision and evaluation (Section~\ref{sec:exp-setup}).
     \item[] Guidelines:
     \begin{itemize}
         \item The answer \answerNA{} means that the core method development in this research does not involve LLMs as any important, original, or non-standard components.

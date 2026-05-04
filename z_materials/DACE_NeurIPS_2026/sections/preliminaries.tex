@@ -1,0 +1,26 @@
+% ==========================================================
+% == Section 3: Preliminaries and Problem Formalization    ==
+% ==========================================================
+\section{Preliminaries and Problem Formalization}
+\label{sec:preliminaries}
+
+% [段 3.1 · 继承 MAGIC 博弈形式化] 大意:简明复述 MAGIC 中的非对称序贯博弈,作为 DACE 的基础。强调 SPNE 是继承而非重证。
+% 撰写逻辑:定义 attacker policy π_A（把 seed q 改写为 x)、defender policy π_D（把 x 映射到 y_D)、回报 r_A, r_D 及其零和结构;指出 MAGIC 证明在序贯博弈下存在 SPNE,DACE 继承这一保证但在策略空间和记忆结构上增加新机制。
+% 中文对应内容:沿用 MAGIC,我们把 LLM 安全协同训练建模为双玩家非对称序贯博弈:给定种子 prompt q,attacker 在策略 π_A(·|q) 下生成改写 x;defender 在 π_D(·|x) 下生成响应 y_D;回报分别为 r_A(x, y_D), r_D(x, y_D) 且互为相反（零和的攻击有效性部分)。MAGIC 证明了这一博弈存在子博弈完美 Nash 均衡（SPNE）,并据此对对齐的稳健性给出均衡意义的保证。我们直接继承这一形式化——因为 DACE 不改动博弈结构,只在 attacker 侧增加结构化策略空间 + 归一化覆盖奖励,在 defender 侧增加贝叶斯记忆,SPNE 性质保持不变,同时新机制针对的是"均衡路径内"的训练动力学病态（下段形式化）。
+We inherit the asymmetric sequential game formalization of MAGIC~\citep{magic2025}. Let $q$ denote a seed prompt, $x\!\sim\!\piA(\cdot\mid q)$ the attacker's rewrite, and $y_D\!\sim\!\piD(\cdot\mid x)$ the defender's response. The two players receive rewards $r_A(x,y_D)$ and $r_D(x,y_D)$ satisfying a zero-sum structure on the effectiveness component, i.e.\ an attack that is harmful to the defender is helpful to the attacker and vice versa. MAGIC further shows that this sequential game admits a subgame-perfect Nash equilibrium (SPNE), which yields alignment guarantees on the equilibrium path. \method leaves the game structure untouched---so all SPNE properties are inherited---and instead addresses failure modes of the \emph{training dynamics} that converge to such an equilibrium.
+
+% [段 3.2 · 形式化两大病态] 大意:把 intro 的两大病态用数学方式定义,铺出 §4 的优化目标。
+% 撰写逻辑:定义 strategy 描述符 b(x) ∈ B,把 attack 分布 π_A 投影到 strategy 空间分布 p_{π_A};病态 1 = p_{π_A} 的 Shannon 熵 H(p_{π_A}) 在训练中远离最大值 log |B|;病态 2 = defender 在历史攻击集 H_t（训练早中期 checkpoint 抽取)上的 refusal/ASR 随 t 增加而衰减;并把两者作为 DACE 要联合优化的两个目标。
+% 中文对应内容:我们用两条数学语句刻画 intro 提到的双病态。令 b(x) 为攻击 x 的策略描述符,p_{π_A} 为 attacker 策略在策略空间 B 上诱导的边际分布,则(i) 攻击策略坍缩: H(p_{π_A,t}) ≪ log |B|,且随训练时间 t 增大该熵持续偏离最大值;(ii) 防御对抗遗忘: 对训练早期收集的攻击集合 H_{t_0}（t_0 ≪ t),防御者在时间 t 的拒答率/安全率 E_{x ∈ H_{t_0}} [1 − ASR_t(x)] 随 t 增长而下降。DACE 把这两个指标作为需要联合优化的目标:(a) 覆盖广度（高熵策略分布)↔ 归一化覆盖增益奖励(§4.3);(b) 记忆持久度（对 H_{t_0} 的稳定高拒答率)↔ 贝叶斯对抗回放（§4.4）。
+We give a compact formalization of the two pathologies that \method is designed to mitigate. Let $b(\cdot)$ map an attack to its strategy descriptor in the $12\times10$ grid $\strategyspace$ (Section~\ref{sec:method-space}), and let $\mathbf{p}_{\piA,t}$ denote the marginal distribution over $\strategyspace$ induced by the attacker policy at training step $t$. Let $\mathcal{H}_{t_0}$ denote the set of attack rewrites sampled from $\piA$ at an earlier training step $t_0\!\ll\!t$, and let $\mathrm{ASR}_t(x)$ be the probability that $\piD$ at step $t$ produces a harmful response to $x$. We define:
+\begin{definition}[Attack Strategy Collapse]
+\label{def:collapse}
+The attacker exhibits \emph{strategy collapse} at training step $t$ if the entropy of its strategy distribution is bounded away from the uniform maximum, i.e., $H(\mathbf{p}_{\piA,t})\ll \log|\strategyspace|$, and this gap does not shrink as $t$ grows.
+\end{definition}
+\begin{definition}[Defense Adversarial Forgetting]
+\label{def:forgetting}
+The defender exhibits \emph{adversarial forgetting} between steps $t_0$ and $t$ if the safety rate on earlier attacks decays with time, i.e., $\mathbb{E}_{x\in\mathcal{H}_{t_0}}[1-\mathrm{ASR}_t(x)]$ is non-increasing in $t$ for $t>t_0$.
+\end{definition}
+% [段 3.3 · 指出联合优化必要性] 大意:把两者作为 DACE 的联合目标;为 §4 做铺垫。
+% 中文对应内容:在协同演化中,Definition \ref{def:collapse} 和 \ref{def:forgetting} 分别代表"攻击广度"和"防御记忆"两条维度上的训练动力学病态;二者在反馈循环中互相加强（见 §1）,因此必须作为联合目标一起优化。DACE 的攻击者侧机制以缓解坍缩为目标,防御者侧机制以缓解遗忘为目标,二者通过统一档案池耦合。§\ref{sec:method} 给出具体实现。
+These two definitions isolate, respectively, \emph{coverage} of the threat space (the attacker's side) and \emph{memory} of past threats (the defender's side). As argued in Section~\ref{sec:intro}, they couple through the shared training loop---a collapsed attacker fuels defender forgetting, and a forgetful defender rewards attacker collapse---so a principled remedy must treat them as \emph{joint} optimization targets. The next section introduces \method, whose attacker-side mechanism (Section~\ref{sec:method-attacker}) explicitly increases $H(\mathbf{p}_{\piA,t})$ via a normalized KL-contraction reward, and whose defender-side mechanism (Section~\ref{sec:method-replay}) maintains $\mathbb{E}_{x\in\mathcal{H}_{t_0}}[1-\mathrm{ASR}_t(x)]$ through a Bayesian adversarial replay pool; the two mechanisms are coupled by the single archive $\archive$ that both read from and write to.
