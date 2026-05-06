@@ -411,13 +411,13 @@ Directly solving this constrained joint optimization is computationally intracta
 \begin{figure*}[t]
   \centering
   \fbox{\rule[-2.8cm]{0pt}{5.6cm}\rule[-2.8cm]{0.95\linewidth}{0pt}}
-  \caption{\textbf{Overview of \method.} The framework proceeds in two phases: \textbf{Phase 1 (Initialization)} warm-starts the attacker via SFT on strategy-conditioned CoT data so that it can produce structured $\langle\texttt{think},\texttt{strategy},\texttt{answer}\rangle$ outputs. \textbf{Phase 2 (Iterative co-evolution)} alternates between (i) attacker RL with a normalized marginal coverage gain reward over the explicit $12\times10$ strategy space, and (ii) defender RL on a mixed mini-batch of freshly generated attacks and replayed attacks drawn from a unified Bayesian adversarial replay pool. The pool simultaneously tracks strategy frequencies (for the coverage reward) and per-entry Beta--Bernoulli threat posteriors (refreshed by time decay and Thompson sampling) so that coverage and persistence are jointly optimized.}
+  \caption{\textbf{Overview of \method.} The framework proceeds in two phases: \textbf{Phase 1 (Attack Strategy Warm-up via Imitation Learning)} warm-starts the attacker via SFT on strategy-conditioned CoT data so that it can produce structured $\langle\texttt{think},\texttt{strategy},\texttt{answer}\rangle$ outputs. \textbf{Phase 2 (Diversity-Driven Adversarial Co-Evolution)} alternates, \emph{attacker first}, between (i) attacker RL with a normalized marginal coverage gain reward over the explicit $12\times10$ strategy space, and (ii) defender RL on a mixed mini-batch $\mathcal{D}_{\mathrm{train}}=\mathcal{D}_{\mathrm{new}}\cup\mathcal{D}_{\mathrm{replay}}$ of freshly generated attacks and replayed attacks drawn from a unified Bayesian adversarial replay pool. The pool simultaneously tracks strategy frequencies (for the coverage reward) and per-entry Beta--Bernoulli threat posteriors (refreshed by time decay and Thompson sampling) so that coverage and persistence are jointly optimized.}
   \label{fig:pipeline}
 \end{figure*}
 
-% [Section 3 引子段] 大意：承接 §2，解释 §3 组织方式；预告四个子节。
-% 中文对应内容：本节按 MAGIC 的方法组织方式展开 DACE：§3.1 给出 SFT+迭代 RL 的整体训练流程；§3.2 定义显式 12×10 攻击策略空间并给出 attacker 三段式输出；§3.3 介绍 attacker 侧的多样性感知优化；§3.4 介绍 defender 侧的贝叶斯对抗回放；§3.5 正式给出所有奖励组件并组合最终目标函数。
-We approximate the bilevel game by an alternating optimization scheme (Section~\ref{sec:method-training}) with an explicitly structured attack space (Section~\ref{sec:method-space}), a diversity-aware attacker objective (Section~\ref{sec:method-attacker}), and a Bayesian replay mechanism for the defender (Section~\ref{sec:method-replay}). The full reward formulation---including the components inherited from MAGIC and the coverage term we add---is given in Section~\ref{sec:method-reward}. The complete pseudocode, hyperparameters, and boundary cases are deferred to Appendix~\ref{apdx:algorithm}.
+% [Section 3 引子段 · 总-分 roadmap] 大意：参考 MAGIC 开头，先给一段高层总述，把 §3 的四个子节显式映射回 §2 的两大病态（Def 1 Collapse / Def 2 Forgetting），让读者看到森林再看树木。
+% 中文对应内容：直接求解 Eq.(1)-(2) 的约束双层优化在深度 RL 中不可行。我们给出一个可工程化的近似方案 DACE，由两项互补机制组成：attacker 侧通过显式 12×10 策略空间和归一化边际覆盖增益抬升策略熵（直接缓解 Def 1 所定义的坍缩）；defender 侧通过混合 batch 与贝叶斯对抗回放池上界化遗忘统计量 F (直接缓解 Def 2 所定义的遗忘)。两侧机制共享唯一的统一档案池 A，使多样性探索与回放驱动的持续鲁棒性在训练中互为正反馈。§3.1 给出两阶段训练总流程；§3.2 定义结构化策略空间；§3.3 构造归一化覆盖奖励；§3.4 构造贝叶斯回放池；§3.5 把所有奖励组件合成最终目标。
+Directly solving the constrained bilevel objective of Eqs.~(1)--(2) is intractable in deep RL. We approximate it with \method through two complementary mechanisms: on the \textbf{attacker side}, an explicit $12{\times}10$ strategy space (Section~\ref{sec:method-space}) with a \emph{normalized marginal coverage gain} reward (Section~\ref{sec:method-attacker}) lifts strategy entropy against Definition~\ref{def:collapse}; on the \textbf{defender side}, a \emph{Bayesian adversarial replay pool} (Section~\ref{sec:method-replay}) mixes fresh and historically threatening attacks into each mini-batch to bound the forgetting statistic of Definition~\ref{def:forgetting}. The two sides are coupled by a single \emph{unified archive} $\archive$ they both read from and write to, so coverage and threat persistence are optimized jointly. Section~\ref{sec:method-training} lays out the two-phase training schedule and Section~\ref{sec:method-reward} collects the reward components.
 
 
 % ----------------------------------------------------------
@@ -426,24 +426,28 @@ We approximate the bilevel game by an alternating optimization scheme (Section~\
 \subsection{Training Process}
 \label{sec:method-training}
 
-% [段 3.1.1 · Phase 1 (SFT first)] 大意：按用户要求把 SFT 放在前面讲，保持 MAGIC 的 Phase 1 / Phase 2 结构。
-% 中文对应内容：Phase 1——攻击能力初始化：直接用 base instruct 模型做 attacker 时，它对 harmful 种子会大概率直接拒答，无法产出高质量改写。我们借鉴 MAGIC 的 SFT 热启动思路，但把它升级成 strategy-conditioned CoT：构建一个 CoT 蒸馏集，每条样本都要求 attacker 同时输出思维链、明确选定的 (risk, style) 策略和改写后的 prompt。SFT 目标是最大化给定种子 q 下 y_A 的对数似然。详细数据构造见 §4.1。
-\textbf{Phase 1: Offensive Capability Initialization.}\quad
-We observe, following~\citet{magic2025}, that directly employing an instruct-tuned base model as the attacker produces high refusal rates on harmful seeds. In \method we therefore warm-start the attacker $\piA$ with supervised fine-tuning (SFT) on a \emph{strategy-conditioned} CoT dataset, where each example requires $\piA$ to produce a reasoning trace, an explicitly selected attack strategy $(s, c)$, and a rewritten prompt in a structured three-part format (Section~\ref{sec:method-space}). Dataset construction details are deferred to Section~\ref{sec:exp-data} and Appendix~\ref{apdx:prompts}. Writing $\mathcal{D}_{\text{sft}}$ for the SFT dataset, the warm-start objective is
+% [段 3.1.0 · MAGIC 式总述] 大意：在两阶段展开之前给一个 2-3 句的 bridge，交代"攻击侧先练、然后在 RL 里让 attacker 先手、defender 后手混合 batch"这一闭环。借鉴 MAGIC 的总述写法，让读者先看到整体骨架。
+% 中文对应内容：我们把 DACE 的训练刻画为 attacker $\piA$ 与 defender $\piD$ 之间的对抗序贯博弈，分为两阶段：阶段一以策略条件化的 CoT 模仿学习热启动攻击者，使其具备基本的策略选择与结构化改写能力；阶段二以 attacker 先手、defender 后手的迭代方式执行 GRPO 强化学习，并用统一档案池 A 把多样性激励与对抗回放串联成闭环。图 2 给出完整流程。
+We cast \method's safety alignment as an adversarial sequential game between the attacker $\piA$ and the defender $\piD$, and split the training procedure into two phases, illustrated in Figure~\ref{fig:pipeline}: \textbf{(1)} \emph{Attack Strategy Warm-up via Imitation Learning}, which equips the attacker with strategy-conditioned rewriting before any RL begins, and \textbf{(2)} \emph{Diversity-Driven Adversarial Co-Evolution}, which alternates attacker and defender updates under GRPO while a shared archive $\archive$ couples strategy-level diversity with Bayesian replay.
+
+% [段 3.1.1 · Phase 1 (SFT)] 大意：重新标题 Phase 1: Attack Strategy Warm-up via Imitation Learning，突出"策略条件化的模仿学习"而不是 SFT 本身。
+% 中文对应内容：Phase 1——攻击策略模仿学习热启动：直接用 instruct base 做 attacker 对 harmful 种子会高概率拒答，也无法可靠声明策略。我们借鉴 MAGIC 的 SFT 热启动思路，将其升级为策略条件化的 CoT 模仿学习：每条 SFT 样本要求 attacker 同时输出思维链、显式选定的 (s, c) 策略和改写 prompt，三段落以 <think>/<strategy>/<answer> 标记分隔。SFT 的极大似然目标把攻击者初始化到 12×10 网格上的均匀覆盖，为后续 RL 中覆盖奖励的稳定梯度提供前提。
+\textbf{Phase 1: Attack Strategy Warm-up via Imitation Learning.}\quad
+Following~\citet{magic2025}, we observe that directly employing an instruct-tuned base model as the attacker produces prohibitively high refusal rates on harmful seeds, and that it cannot yet declare a strategy descriptor $(s, c)$ reliably. To resolve this cold-start problem, we warm-start $\piA$ with supervised fine-tuning (SFT) on a \emph{strategy-conditioned CoT} dataset in which every example requires the attacker to emit a reasoning trace, an explicit attack strategy $(s, c) \in \strategyspace$, and a structured rewrite, all separated by \texttt{<think>}/\texttt{<strategy>}/\texttt{<answer>} tags (Section~\ref{sec:method-space}). Writing $\mathcal{D}_{\text{sft}}$ for the SFT dataset, the warm-start objective is the standard negative log-likelihood
 \begin{equation}
   \mathcal{L}_{\text{SFT}}(\piA) \;=\; -\,\mathbb{E}_{(q, y_A) \sim \mathcal{D}_{\text{sft}}}\bigl[\log \piA(y_A \mid q)\bigr].
 \end{equation}
-This step equips the attacker with format compliance, strategy selection, and initial coverage over the $12\times10$ grid---crucial for the subsequent RL phase, where coverage-based rewards on low-frequency cells would otherwise provide unreliable gradients.
+This step equips the attacker with format compliance, strategy selection, and initial coverage over the $12\times10$ grid---crucial for the subsequent RL phase, where coverage-based rewards on low-frequency cells would otherwise provide unreliable gradients. Dataset construction details are deferred to Section~\ref{sec:exp-data} and Appendix~\ref{apdx:prompts}.
 
-% [段 3.1.2 · Phase 2 alternating RL] 大意：保留 MAGIC 的 alternating defender / attacker 表述，补充 DACE 的 archive 双重读写和混合 batch。
-% 中文对应内容：Phase 2——迭代协同演化：采用 GRPO 进行参数更新。每一轮先做 defender optimization（固定 attacker，defender 对每个输入生成 G 个响应，根据奖励更新 π_D），后做 attacker optimization（固定 defender，attacker 对每个 seed 生成 G 个攻击，根据奖励更新 π_A）。DACE 在此基础上引入统一的攻击档案池 A：attacker 侧成功的改写加入 A 以更新策略频次；defender 侧的训练 batch 由新攻击和 Thompson 采样的回放攻击混合而成，训练完成后更新 posterior 并剪枝。完整伪代码见附录 A。
-\textbf{Phase 2: Iterative Co-evolution.}\quad
-In each round we alternate between defender optimization (inner problem) and attacker optimization (outer problem), implemented via Group Relative Policy Optimization (GRPO)~\citep{shao2024grpo, guo2025deepseek}. Throughout Phase 2 we maintain a unified archive $\archive$ that doubles as a strategy-frequency tracker (used by the coverage reward in Section~\ref{sec:method-attacker}) and a Bayesian replay pool (used by the defender's mixed mini-batch in Section~\ref{sec:method-replay}). Concretely, for each round $k=1,\dots,K$:
+% [段 3.1.2 · Phase 2 alternating RL] 大意：严格对齐 pseudocode v3.1——attacker 先手 (Stage 1)，defender 后手混合 batch (Stage 2)；强调档案池在两阶段结束时都接收新的成功样本。
+% 中文对应内容：Phase 2——多样性驱动的对抗协同演化：采用 GRPO 进行参数更新，每一轮先做 Stage 1 attacker optimization 再做 Stage 2 defender optimization，两阶段共享并持续维护统一档案池 A。(i) Stage 1: 固定 π_D，对 batch 中每个 seed，attacker 生成 G 个策略条件化 rewrite，defender 给出单条响应，根据多样性感知复合奖励 R_A 更新 π_A；阶段末把本阶段新成功的 rewrite 插入 A。(ii) Stage 2: 固定 π_A，defender 的每个 mini-batch 由两部分混合——新攻击 D_new 和回放攻击 D_replay（通过 Thompson 采样从 A 抽取），defender 对其中每个 prompt 生成 G 个响应，按 R_D 在混合 batch 上统一更新 π_D，并对 D_replay 内条目做后验更新与即时剪枝；阶段末把本阶段新成功的攻击再次入池。每轮开始时对 A 内所有条目施加时间衰减以处理 defender 漂移。完整伪代码见附录 A。
+\textbf{Phase 2: Diversity-Driven Adversarial Co-Evolution.}\quad
+We optimize both policies with Group Relative Policy Optimization (GRPO)~\citep{shao2024grpo, guo2025deepseek}. Each round $k=1,\dots,K$ begins with time decay applied to all archive posteriors (Section~\ref{sec:method-replay}) and then alternates two stages, \emph{attacker first}:
 \begin{itemize}[leftmargin=*, topsep=2pt, itemsep=2pt]
-  \item \textit{Defender optimization (fix $\piA$).} For a mini-batch of seeds, the attacker produces one rewrite per seed; the defender generates $G$ candidate responses per rewrite; $\piD$ is updated on a mixed batch of freshly generated attacks and replayed attacks drawn by Thompson sampling from $\archive$. Posteriors of replayed samples are refreshed after the update, and samples that are confidently neutralized are pruned.
-  \item \textit{Attacker optimization (fix $\piD$).} For a mini-batch of seeds, the attacker generates $G$ structured rewrites per seed, the defender produces one response per rewrite, and $\piA$ is updated by GRPO using the composite attacker reward $R_A$ (Section~\ref{sec:method-reward}). Every successful rewrite is inserted into $\archive$ with its descriptor $b(x)$ and posterior counts.
+  \item \textit{Stage 1 --- Attacker optimization (fix $\piD$).} For each seed in a mini-batch, $\piA$ generates $G$ structured rewrites; the frozen defender produces one response per rewrite, which a safety judge scores for success; $\piA$ is updated by GRPO using the composite attacker reward $R_A$ (Section~\ref{sec:method-reward}) that combines the zero-sum effectiveness term with the coverage bonus $R_{\mathrm{div}}$.
+  \item \textit{Stage 2 --- Defender optimization (fix $\piA$) on a mixed batch.} The defender is trained on a \emph{mixed} mini-batch $\mathcal{D}_{\mathrm{train}}=\mathcal{D}_{\mathrm{new}}\cup\mathcal{D}_{\mathrm{replay}}$, where $\mathcal{D}_{\mathrm{new}}$ (size $B_{\mathrm{train}}$) holds freshly generated attacks from $\piA$ on new seeds, and $\mathcal{D}_{\mathrm{replay}}$ (size $B_{\mathrm{replay}}$) is drawn from $\archive$ by Thompson sampling. $\piD$ produces $G$ rollouts per prompt and is updated in a single GRPO step on the concatenated group. After the update, posteriors of entries in $\mathcal{D}_{\mathrm{replay}}$ are refreshed and confidently neutralized entries are pruned.
 \end{itemize}
-Time decay is applied to all archive posteriors at the start of every round so that threat estimates track the evolving $\piD$. We refer the reader to Appendix~\ref{apdx:algorithm} for the complete training algorithm.
+At the end of both stages, every new successful attack is inserted into $\archive$ with its strategy descriptor $b(x)$ and initial counts $(s{=}1, f{=}0)$, so both sides continuously supply new entries for multiplexing. The full pseudocode is given in Appendix~\ref{apdx:algorithm}.
 
 
 % ----------------------------------------------------------
@@ -458,11 +462,9 @@ We formalize the attacker's action space along two interpretable axes:
 \begin{equation}
   \strategyspace \;=\; \riskspace \times \stylespace, \qquad |\riskspace|=12,\ \ |\stylespace|=10,\ \ |\strategyspace|=120.
 \end{equation}
-The risk-category axis $\riskspace$ is derived from the Llama-Guard-4 safety taxonomy~\citep{llamaguard4_2026}. From its $14$ original categories we prune two: \textit{Sexual Content}, whose benign prompts are mis-classified as non-safe by the judge at an unusually high rate, making the corresponding column of the coverage signal unreliable; and \textit{Code Interpreter Abuse}, which presupposes tool-execution surfaces absent from our text-only defender. The remaining 12 categories correspond to Llama-Guard-4 codes S1--S11 and S13, and are listed with their descriptions in Appendix~\ref{apdx:space-design}. The style axis $\stylespace$ adopts the 10 attack styles of Rainbow Teaming~\citep{samvelyan2024rainbow} without modification: \textit{Slang}, \textit{Technical Terms}, \textit{Role Play}, \textit{Authority Manipulation}, \textit{Misspellings}, \textit{Word Play}, \textit{Emotional Manipulation}, \textit{Hypotheticals}, \textit{Historical Scenario}, and \textit{Uncommon Dialects}. Every attack $x$ is mapped to its strategy descriptor $b(x)=(s, c)\in\strategyspace$.
+The risk-category axis $\riskspace$ is adapted from the Llama-Guard-4 safety taxonomy~\citep{llamaguard4_2026} with two categories pruned for reliability (\textit{Sexual Content} and \textit{Code Interpreter Abuse}; justification in Appendix~\ref{apdx:space-design}), and the style axis $\stylespace$ adopts the 10 linguistic attack styles of Rainbow Teaming~\citep{samvelyan2024rainbow} without modification. Each attack $x$ is mapped to its strategy descriptor $b(x)=(s, c)\in\strategyspace$.
 
-% [段 3.2.2 · 三段式输出 + 直接提取 + faithfulness 说明] 大意：描述 attacker 输出格式、descriptor 提取方式，以及我们如何审计自声明的诚实度（回应 GPT 审查对 self-declared reward hacking 的担忧）。
-% 中文对应内容：为了从 attacker 自身输出直接获取 b(x)，我们要求 attacker 以 <think>..</think> <strategy>..</strategy> <answer>..</answer> 三段式作答，其中 <strategy> 段用固定格式声明 (s, c)。b(x) 通过正则 + 模糊 fallback 提取，避免再调用一个 LLM judge 引入循环依赖。为了降低 attacker 为拿多样性奖励而误报策略的风险，我们在附录中报告 declared 与实际策略的一致性（descriptor faithfulness），并在主实验中通过 SFT 监督、格式奖励与多样性奖励的 group 归一化共同缓解潜在的 reward hacking。完整模板见附录 C。
-The attacker is prompted to emit a structured three-part response, $\langle\texttt{<think>\dots</think>},\allowbreak \texttt{<strategy>\dots</strategy>},\allowbreak \texttt{<answer>\dots</answer>}\rangle$, where the \texttt{<strategy>} block declares the chosen pair in the canonical form ``\texttt{risk category: \ldots / attack style: \ldots}''. Descriptor extraction is performed by a robust regex with a fuzzy substring fallback, i.e.\ $b(x)$ is read off the attacker's own declaration rather than inferred by an auxiliary LLM judge; this keeps the coverage signal self-consistent and avoids an additional judge-induced circular dependency. Because self-declared descriptors are in principle exposed to reward hacking---an attacker could name a rare strategy merely to harvest the coverage reward---we mitigate this risk along three independent axes: (i) the SFT warm-start (Section~\ref{sec:method-training}) teaches the declared strategy to match the realized text; (ii) the format reward ($R_{\mathrm{fmt}}$, Section~\ref{sec:method-reward}) penalizes malformed declarations and strategies outside the grid; and (iii) we audit declared-vs-realized consistency post hoc (\emph{descriptor faithfulness rate}), reported in Appendix~\ref{apdx:expanded-results}. Full prompt templates are provided in Appendix~\ref{apdx:prompts}.
+The attacker is prompted to emit a structured three-part response $\langle\texttt{<think>},\texttt{<strategy>},\texttt{<answer>}\rangle$, where the \texttt{<strategy>} block declares the chosen $(s, c)$. We extract $b(x)$ from the attacker's own declaration via regex with a fuzzy fallback, avoiding an auxiliary LLM judge and the circular dependency it would induce. Because self-declared descriptors are in principle open to reward hacking, we combine three safeguards: the SFT warm-start teaches declared strategy to match the realized text; the format reward $R_{\mathrm{fmt}}$ (Section~\ref{sec:method-reward}) penalizes malformed or out-of-grid declarations; and a post-hoc descriptor-faithfulness audit is reported in Appendix~\ref{apdx:expanded-results}. Full prompt templates are provided in Appendix~\ref{apdx:prompts}.
 
 
 % ----------------------------------------------------------
@@ -471,41 +473,29 @@ The attacker is prompted to emit a structured three-part response, $\langle\text
 \subsection{Diversity-Aware Attacker Optimization}
 \label{sec:method-attacker}
 
-% [段 3.3.1 · 动机 + reward vanishing 问题] 大意：先指出最朴素做法的 reward vanishing，再引出归一化。
-% 中文对应内容：最朴素的策略多样性奖励是把 archive 中策略分布的 Shannon 熵差作为奖励 R_raw = H(p_{A∪{x}}) - H(p_A)。然而当 |A| 较大时，单样本对分布的扰动量级为 O(1/|A|)，对应的熵增益也是同阶，后期 RL 信号趋零，难以在 group-relative advantage 中提供有效梯度。
-Computing diversity at the \emph{strategy level} is attractive, but the simplest candidate---adding a raw marginal entropy gain---is ill-behaved under long training. Let $\archivedist$ be the empirical distribution of descriptors in $\archive$ and $H(\cdot)$ the Shannon entropy. The raw coverage signal
+% [段 3.3.1 · R_raw 与 reward vanishing] 精简为一句 + 公式 + 一句。
+Let $\archivedist$ be the empirical descriptor distribution in $\archive$ and $H(\cdot)$ the Shannon entropy. A naive strategy-level diversity signal is the raw marginal entropy gain
 \begin{equation}
-  R_{\mathrm{raw}}(x) \;=\; H(\mathbf{p}_{\archive\cup\{x\}})\ -\ H(\archivedist)
+  R_{\mathrm{raw}}(x) \;=\; H(\mathbf{p}_{\archive\cup\{x\}})\ -\ H(\archivedist),
 \end{equation}
-is of order $\mathcal{O}(1/|\archive|)$: a single sample can shift the empirical distribution by at most $1/|\archive|$ in one coordinate, so both $R_{\mathrm{raw}}$ and the differences between samples in a GRPO group collapse to zero as training progresses---a textbook reward-vanishing regime.
+but its magnitude is $\mathcal{O}(1/|\archive|)$, so both the reward and its within-group differences vanish as training proceeds.
 
-% [段 3.3.2 · 归一化定义 + 量级性质 + clip] 大意：给出归一化边际覆盖增益，分子分母同阶保证信号 O(1)；按 GPT 审查修正：描述 clip_negative=True，只保留正向奖励，不宣称 signed gradient。
-% 中文对应内容：我们把 R_raw 归一化到"当前档案池状态下任意单样本能达到的最大边际增益"作为分母。分子与分母均为 O(1/|A|) 量级同步衰减，比值稳定在 O(1)。落入当前最稀疏槽位的样本 R_div = 1；落入过度饱和槽位的样本在归一化后可能为负。但在主实验中，我们使用 clip_negative=True 将负值截断为 0，以换取训练稳定性——这一约束意味着 R_div 在实操中起"奖励稀疏策略而非惩罚饱和策略"的作用，我们将在 §5.3 的 ablation 中研究关闭截断的效果。
-To recover a non-vanishing signal, we normalize by the best single-sample entropy gain attainable in the current archive state. For a sample $x$ with descriptor $b(x)$, define
+% [段 3.3.2 · R_div 定义 + clip + KL 附录指针] 压缩讨论，合并 KL 一句。
+To recover a non-vanishing signal, we normalize by the best single-sample entropy gain attainable at the current archive state:
 \begin{equation}
   R_{\mathrm{div}}(x) \;=\;
   \max\!\left(0,\ \ \frac{H(\mathbf{p}_{\archive\cup\{x\}})\ -\ H(\archivedist)}{\displaystyle\max_{b\in\strategyspace}\!\bigl[H(\mathbf{p}_{\archive\cup\{x_b\}})-H(\archivedist)\bigr]\;+\;\varepsilon_{\mathrm{div}}}\right),
   \label{eq:coverage-gain}
 \end{equation}
-where $x_b$ denotes a hypothetical sample whose descriptor falls into cell $b$, and $\varepsilon_{\mathrm{div}}>0$ is a small smoothing constant. Numerator and denominator are both $\mathcal{O}(1/|\archive|)$ and decay at the same rate, so the ratio remains $\mathcal{O}(1)$ throughout training, with a sample landing in the sparsest cell earning $R_{\mathrm{div}}=1$. In our main experiments we clip negative gains to zero ($\mathtt{clip\_negative}=\mathrm{true}$), so $R_{\mathrm{div}}$ acts purely as a positive incentive toward under-explored cells; the effect of removing the clip is studied in the full ablation table (Tab.~\ref{tab:ablation-full}). The denominator depends only on the archive state and is therefore shared across a mini-batch, so the per-batch overhead is a single $\mathcal{O}(|\strategyspace|)=\mathcal{O}(120)$ sweep over cells.
+where $x_b$ is a hypothetical sample falling in cell $b$ and $\varepsilon_{\mathrm{div}}>0$ is a smoothing constant. Numerator and denominator decay at the same $\mathcal{O}(1/|\archive|)$ rate, so the ratio stays $\mathcal{O}(1)$ throughout training, and a sample landing in the sparsest cell earns $R_{\mathrm{div}}=1$. We clip negative gains to zero in the main experiments (ablated in Tab.~\ref{tab:ablation-full}). Information-theoretically, $R_{\mathrm{div}}(x)$ is the fraction of one-step KL contraction toward the uniform strategy prior that $x$ achieves, so maximising it directly addresses Definition~\ref{def:collapse} (derivation in Appendix~\ref{apdx:kl-contraction}).
 
-% [段 3.3.3 · KL 视角] 大意：给出恒等式 H(p)=log|B| - D_KL(p||u)，说明归一化覆盖增益等价于单步 KL 收缩效率；按 GPT 意见，删除 "zero-avoiding" 等理论细节风险，只保留准确表述。
-% 中文对应内容：利用恒等式 H(p) = log|B| - D_KL(p||u)，R_raw = D_KL(p_A||u) - D_KL(p_{A∪{x}}||u)，即加入样本后策略分布到均匀分布的 KL 散度减少量。因此归一化覆盖增益等价于 "单步 KL 收缩效率"——该样本对拉近 p_A 到均匀分布所做出的实际贡献占"该步可达最大贡献"的比例。这给覆盖奖励一个干净的信息论解读：最大化 R_div 等价于最大化 entropy 提升效率，而 entropy 达到 log|B| 即分布均匀。
-\paragraph{A KL-contraction interpretation.} Using the identity $H(\mathbf{p}) = \log|\strategyspace| - \KL(\mathbf{p}\|\uniform)$ with $\uniform$ the uniform distribution over $\strategyspace$, the marginal entropy gain rewrites as the single-step KL reduction toward the uniform prior:
+% [段 3.3.3 · λ(x)] 压缩。
+To reward diversity only when it carries threat signal, the coverage term is gated by a success-aware coefficient:
 \begin{equation}
-  H(\mathbf{p}_{\archive\cup\{x\}})\ -\ H(\archivedist)
-  \;=\; \KL(\archivedist \,\|\, \uniform)\ -\ \KL(\mathbf{p}_{\archive\cup\{x\}} \,\|\, \uniform).
-\end{equation}
-Hence, before the positive clip, $R_{\mathrm{div}}(x)$ is the \emph{fraction of one-step KL contraction} (toward the uniform strategy prior) that sample $x$ achieves, relative to the best attainable single-sample contraction at the current archive state. Maximizing $R_{\mathrm{div}}$ over training therefore drives the attacker's empirical strategy distribution toward entropy maximization, directly addressing Definition~\ref{def:collapse}.
-
-% [段 3.3.4 · differentiated lambda + success/benign 定义] 大意：给出 λ(x)，并在此明确 "attack success" 在 harmful/benign 两种种子下的不同定义（回应 GPT 审查 R3）。
-% 中文对应内容：为避免"形式上多样但无效"的奖励漏洞，我们让多样性奖励乘以差异化系数 λ(x)：攻击成功时 λ=1.0，失败时 λ=0.5。"攻击成功"在我们的设置下对 harmful 与 benign 种子有不同判定：对于 harmful 种子，defender 被诱导产生 unsafe 响应即算 success；对于 benign 种子（over-refusal 目标），defender 发生错误拒答或错误地产出 unsafe 内容都算 success。将失败样本的 λ 设为 0.5 而非 0，是为了让冷门策略方向在尚未学会有效攻击时仍保留探索梯度，避免过早放弃。
-To reward diverse attacks only when they actually carry threat signal, the coverage term is gated by a success-aware coefficient:
-\begin{equation}
-  \lambda(x) \;=\; \begin{cases} 1.0 & \text{if } x \text{ succeeds},\\[2pt] 0.5 & \text{otherwise}. \end{cases}
+  \lambda(x) \;=\; \begin{cases} 1.0 & \text{if } x \text{ succeeds},\\[2pt] 0.5 & \text{otherwise}, \end{cases}
   \label{eq:lambda}
 \end{equation}
-\method uses a dual definition of ``success'' matching the two seed types (\S\ref{sec:exp-data}): on a harmful seed, a rewrite succeeds if the defender produces an unsafe response; on a benign seed, a rewrite succeeds if the defender over-refuses a benign request or erroneously produces unsafe content. Setting $\lambda=0$ on failures turned out to be too aggressive: strategy cells that are hard to crack early in training lose their exploration gradient entirely and are \emph{de facto} abandoned. A half-weight $\lambda=0.5$ retains a strictly positive exploration pressure toward under-exercised regions while keeping successful rewrites twice as attractive. Under GRPO's group-relative advantage, this $2{:}1$ ratio naturally promotes samples that are \emph{simultaneously} effective and diverse.
+where success means an unsafe response on harmful seeds and an over-refusal (or erroneous unsafe content) on benign seeds. The $2{:}1$ ratio makes successful rewrites twice as attractive under GRPO's group-relative advantage while preserving a positive exploration gradient on under-exercised cells, which a $\lambda=0$ schedule would eliminate.
 
 
 % ----------------------------------------------------------
@@ -514,56 +504,35 @@ To reward diverse attacks only when they actually carry threat signal, the cover
 \subsection{Bayesian Adversarial Replay for Defender}
 \label{sec:method-replay}
 
-% [段 3.4.1 · Unified archive] 大意：阐述档案池的双重功能和条目结构。
-% 中文对应内容：我们让档案池 A 承担两重功能：对 attacker 端提供策略频次以支撑归一化覆盖奖励；对 defender 端提供历史攻击以防对抗性遗忘。每个条目形式为 (x_i, b(x_i), s_i, f_i)，其中 s_i, f_i 分别是该样本被回放时"攻破 defender"与"被 defender 拒答"的衰减累计计数；每一轮 attacker RL 与 defender RL 结束时分别将本轮的新成功攻击加入 A。
-We couple the attacker-side coverage reward and the defender-side replay mechanism through a single \emph{unified archive} $\archive$. Each entry stores the attack prompt $x_i$, its strategy descriptor $b(x_i)$ (used when updating $\archivedist$), and two non-negative real counts $(s_i, f_i)$ that parameterize a threat posterior. Successful rewrites produced during either attacker-RL or defender-RL stages are inserted into $\archive$ at the end of the stage, so both sides continuously supply new entries.
+% [段 3.4.1 · 引入混合 batch + unified archive + 回应 Def 2] 大意：最先告诉读者 defender 的 batch 到底长什么样，然后把"档案池"的物理结构交代清楚。
+% 中文对应内容：为缓解 Def 2 的防御对抗性遗忘，我们让 defender 的每个 mini-batch 由两部分混合而成：D_new（size B_train）是 attacker 在新种子上实时生成的攻击；D_replay（size B_replay）是从统一档案池 A 中通过 Thompson 采样抽取的历史高威胁攻击。两者共享同一个 GRPO 更新步骤，使 defender 同时获得"跟上当前 attacker"与"不遗忘历史 attacker"的梯度信号。A 中的每个条目形式为 (x_i, b(x_i), s_i, f_i)，两项计数 (s_i, f_i) 作为 Beta-Bernoulli 后验的衰减伪计数；attacker 与 defender 两侧的成功攻击在各自 stage 结束时都会入池。
+To mitigate defense adversarial forgetting (Definition~\ref{def:forgetting}), \method trains the defender on a \emph{mixed} mini-batch
+\begin{equation}
+  \mathcal{D}_{\mathrm{train}} \;=\; \mathcal{D}_{\mathrm{new}} \;\cup\; \mathcal{D}_{\mathrm{replay}}, \qquad |\mathcal{D}_{\mathrm{new}}|=B_{\mathrm{train}},\ \ |\mathcal{D}_{\mathrm{replay}}|=B_{\mathrm{replay}},
+  \label{eq:mixed-batch}
+\end{equation}
+where $\mathcal{D}_{\mathrm{new}}$ is freshly generated by $\piA$ on new seeds, $\mathcal{D}_{\mathrm{replay}}$ is drawn from a \emph{unified archive} $\archive$, and GRPO's per-prompt group-relative advantage keeps the update stable despite the systematic difficulty gap between the two subsets. Each entry in $\archive$ stores an attack $x_i$, its strategy descriptor $b(x_i)$, and two non-negative counts $(s_i, f_i)$ that parameterize a threat posterior; successful rewrites from either Stage~1 or Stage~2 are inserted at stage end.
 
-% [段 3.4.2 · Beta-Bernoulli posterior] 大意：用 Beta-Bernoulli 共轭更新追踪 p_i；按 GPT 意见改用 "filtering approximation with discounted pseudo-counts" 措辞，避免 i.i.d. 与 identical 过强表述。
-% 中文对应内容：把每次回放视为关于 latent 威胁概率 p_i 的一次 Bernoulli 观测，采用 Beta 共轭先验（默认 α=β=1，即均匀先验）。每一步 posterior 由标准的 Beta-Bernoulli 共轭更新给出，我们将其解读为对漂移威胁过程的 Bayesian filtering 近似。posterior 均值是对当前威胁的点估计；posterior 方差对估计不确定性有自然的量化。这正是 SSP 的离散 safety score 更新无法提供的（后者把 few-trial 与 many-trial 的点估计用相同方式累加，不区分置信度）。
-\paragraph{Threat posterior.}
-For each entry we treat its success/failure outcomes as Bernoulli observations of a latent threat probability $p_i$, and we take the conjugate Beta prior with pseudo-counts $\alpha, \beta > 0$ (uniform prior, $\alpha=\beta=1$, in our implementation). Under this model, the filtering posterior has the closed form
+% [段 3.4.2 · Threat posterior + time decay 融合段] 大意：把 posterior + time decay 压成一段，说明为什么要贝叶斯、为什么要衰减；SSP 对照简短点到。
+% 中文对应内容：我们把每次回放视为 latent 威胁概率 p_i 的一次 Bernoulli 观测，取 Beta 共轭先验（α=β=1），得到解析 filtering 后验 p_i | s_i, f_i ~ Beta(α+s_i, β+f_i)；每次 defender 判决后通过共轭更新推进。这个连续的后验提供了估计不确定性（方差）和多次试验聚合，天然对抗单次采样噪声——与 SSP 的离散 safety score 相比，我们既不混淆 few-trial 与 many-trial 的置信度，也不会被 defender 的随机拒答偶然误导。为处理 defender 的非平稳性，每轮开始时对所有条目施加指数时间衰减 (s_i, f_i) ← (γ s_i, γ f_i)，在折扣伪计数意义下把旧证据缓慢遗忘回先验，使 p̂_i 自然追随当前 defender 的能力水平并重新扩大方差。
+We treat each replay of $x_i$ as a Bernoulli observation of a latent threat probability $p_i$, with a Beta($\alpha=\beta=1$) conjugate prior giving the closed-form filtering posterior
 \begin{equation}
   p_i \mid s_i, f_i \;\sim\; \mathrm{Beta}(\alpha+s_i,\,\beta+f_i), \qquad
   \hat p_i \;=\; \frac{\alpha+s_i}{\alpha+\beta+s_i+f_i}.
   \label{eq:posterior}
 \end{equation}
-Each replay round updates the counts by the conjugate step
-\begin{equation}
-  s_i \leftarrow s_i + 1\ \ \text{(attack broke through)},\qquad f_i \leftarrow f_i + 1\ \ \text{(attack refused)},
-  \label{eq:beta-update}
-\end{equation}
-where ``broke through'' follows the same dual definition of success as in Eq.~\ref{eq:lambda}. Unlike a discrete safety score that overwrites the previous tally, the Beta posterior aggregates all past trials and exposes uncertainty through its variance, so few-trial entries can be flagged (high variance) instead of being treated as confidently estimated. This directly targets the first and second limitations of SSP-style replay identified in Section~\ref{sec:intro}.
+After each replay, $s_i$ or $f_i$ is incremented by the conjugate step; at the start of every round, all counts are exponentially discounted $(s_i, f_i) \leftarrow (\gamma s_i, \gamma f_i)$ with $\gamma \in [0.9, 0.99]$ to track defender non-stationarity. The continuous posterior aggregates all trials and quantifies estimation uncertainty through its variance.
 
-% [段 3.4.3 · Time decay] 大意：引入时间衰减处理非平稳 defender；按 GPT 意见说成 "discounted pseudo-counts" 而非 i.i.d.。
-% 中文对应内容：由于 defender 在持续训练，过去的成败记录不再严格反映其当前能力。我们在每轮训练开始时对 A 中所有条目执行指数时间衰减 (s_i, f_i) ← (γ s_i, γ f_i)，相当于在折扣 pseudo-counts 的意义下把旧证据缓慢"遗忘"回先验，后验均值 p̂_i 因此自然追随当前 defender 的能力水平，方差也随之重新扩大。这是第三个维度——非平稳性——的显式建模。
-\paragraph{Time decay for non-stationarity.}
-Because the defender is continuously trained, older trial outcomes are less informative about its current threat level. At the start of every round we exponentially discount the pseudo-counts:
-\begin{equation}
-  s_i \leftarrow \gamma\,s_i,\qquad f_i \leftarrow \gamma\,f_i,\qquad \gamma \in [0.9, 0.99].
-  \label{eq:time-decay}
-\end{equation}
-Geometrically, this pulls $(s_i, f_i)$ back toward the prior, so posterior means $\hat p_i$ regress toward $1/2$ and posterior variances re-expand unless reinforced by new evidence. Because the Beta distribution is defined for arbitrary positive real parameters, the non-integer counts produced by decay remain valid, and the same conjugate update (Eq.~\ref{eq:beta-update}) still applies in subsequent rounds. Our default $\gamma=0.90$ matches the RL schedule used in Section~\ref{sec:experiments}.
-
-% [段 3.4.4 · Thompson sampling] 大意：简述 replay selection 用 Thompson sampling，天然 balance exploit/explore。
-% 中文对应内容：每当 defender 训练需要从 A 抽 B_replay 条样本时，我们对每个条目独立从其后验采样一次 p̃_i ~ Beta(α+s_i, β+f_i)，并按 p̃_i 降序取前 B_replay 个。后验均值高且方差小的样本 (稳定高威胁) 容易抽到高值得到利用；试验次数少、方差大的样本也有机会偶尔抽到高值得到重新验证。Thompson 采样在不引入任何额外超参的前提下自然实现了 explore-exploit 平衡，随着 posterior 稳定它会平滑退化为贪婪 top-B_replay。
-\paragraph{Thompson sampling for replay.}
-When a defender mini-batch requires $B_{\mathrm{replay}}$ historical attacks, we draw one posterior sample per entry and take the top ones by that value:
+% [段 3.4.3 · Thompson sampling 选择 D_replay + pruning 融合段] 大意：保留 Thompson 公式作为 Eq.12；pruning 说明压缩为一句话 + 附录指针。
+% 中文对应内容：在每个 defender 训练步构造 D_replay 时，我们对 A 中每个条目独立从其后验采样一次，按 p̃_i 降序取前 B_replay 个。后验均值高且方差小的"验证过的高威胁"样本稳定抽到高值（利用），试验次数少、方差大的样本也有机会抽到高值被重新验证（探索）；这一过程无需额外超参，随后验稳定会平滑退化为贪婪 top-B_replay。档案规模通过保守剪枝约束：当 p̂_i < τ_prune 且 s_i+f_i > n_min 时移除 x_i（默认 τ_prune=0.45、n_min=2），既避免单次幸运拒答引发过早淘汰，也避免低试验条目被过早剪枝；完整敏感性分析见附录 G。
+\paragraph{Thompson-sampled replay and archive maintenance.}
+When the defender needs $B_{\mathrm{replay}}$ historical attacks, we draw one posterior sample per entry and retain the top of them:
 \begin{equation}
   \tilde p_i \;\sim\; \mathrm{Beta}(\alpha+s_i,\,\beta+f_i), \qquad
   \mathcal{D}_{\mathrm{replay}} \;=\; \operatorname{Top-}B_{\mathrm{replay}}\bigl(\{\tilde p_i\}\bigr).
   \label{eq:thompson}
 \end{equation}
-High-mean, low-variance samples (verified threats) concentrate near their mean and are selected reliably (\emph{exploit}); high-variance samples (few trials) occasionally draw high values and are re-examined (\emph{explore}). The procedure thus induces a parameter-free exploration--exploitation trade-off that degenerates gracefully into greedy top-$B_{\mathrm{replay}}$ selection as posteriors concentrate.
-
-% [段 3.4.5 · Pruning] 大意：说明剪枝条件使用 τ_prune 与 n_min 两个符号，并按 v4 脚本改为 (0.45, 2)。
-% 中文对应内容：当 p̂_i 低到阈值以下且已有足够的试验次数时，剪枝把该条目移出 A。我们用 τ_prune 表示后验均值阈值（与覆盖奖励的 ε_div 区别开以避免混淆）、n_min 表示最小试验次数。主实验默认 τ_prune=0.45、n_min=2，偏保守以防止罕见但仍危险的攻击被过早淘汰；完整消融见 §5.3。
-\paragraph{Pruning.}
-To bound the archive size and purge attacks the defender has learned to refuse, we prune conservatively:
-\begin{equation}
-  \text{remove } x_i \iff \hat p_i < \tau_{\mathrm{prune}} \quad\text{and}\quad s_i + f_i > n_{\min}.
-  \label{eq:prune}
-\end{equation}
-The $n_{\min}$ threshold ensures low-trial entries are never pruned prematurely; the $\tau_{\mathrm{prune}}$ threshold ensures we only purge attacks whose \emph{expected} threat is clearly below the tolerance, rather than reacting to a single lucky refusal. In our main experiments we use $\tau_{\mathrm{prune}}=0.45$ and $n_{\min}=2$, intentionally chosen to err on the side of retaining uncertain but potentially dangerous entries; sensitivity analyses are reported in Appendix~\ref{apdx:training-dynamics}.
+High-mean, low-variance entries are reliably selected (\emph{exploit}); high-variance entries occasionally surface for re-examination (\emph{explore}), yielding a parameter-free exploration--exploitation trade-off. To bound the archive size, an entry is pruned only when $\hat p_i < \tau_{\mathrm{prune}}$ \emph{and} $s_i+f_i > n_{\min}$, so a single lucky refusal cannot evict a low-trial but potentially dangerous attack. Full derivations, default values ($\tau_{\mathrm{prune}}=0.45$, $n_{\min}=2$, $\gamma=0.90$), and sensitivity analyses around the Bayesian hyperparameters $(\gamma, \tau_{\mathrm{prune}}, n_{\min})$ are provided in Appendices~\ref{apdx:bayesian-replay} and~\ref{apdx:training-dynamics}.
 
 
 % ----------------------------------------------------------
@@ -572,32 +541,30 @@ The $n_{\min}$ threshold ensures low-trial entries are never pruned prematurely;
 \subsection{Reward Design}
 \label{sec:method-reward}
 
-% [段 3.5 · 全部奖励分量] 大意：按 MAGIC 风格，formal 定义 R_harm / R_ref / R_fmt，再把 R_div 纳入 R_A 总目标；R_ref 此前丢失，这次补齐。
-% 中文对应内容：我们沿用 MAGIC 的三项基础奖励——format、harmfulness、refusal，在 attacker 侧额外叠加本文提出的多样性奖励 R_div。下面逐一给出形式化定义，最后给出防御者和攻击者的总奖励组合。
-We inherit MAGIC's three base rewards---format, harmfulness, and refusal---and augment them with \method's coverage reward. We define each component formally and then give the combined objective.
+% [段 3.5 · 全部奖励分量] 精简叙述，去除冗余 MAGIC 提及，R_fmt / R_harm / R_ref / R_div 四项逐一给出。
+\method combines four reward components: format, harmfulness, and refusal attached to the co-evolution interaction, plus the new coverage bonus on the attacker side.
 
 \textbf{1. Format Reward ($R_{\mathrm{fmt}}$).}
-As in MAGIC, the attacker is required to separate reasoning from the rewritten prompt, and in \method it is further required to emit a valid strategy declaration. We formalize format compliance as
+The attacker must emit a three-part response separating reasoning, strategy, and answer, which also yields a parseable strategy descriptor $b(y_A)\in\strategyspace$:
 \begin{equation}
   R_{\mathrm{fmt}}(y_A) \;=\; \begin{cases}
-    +r_{\mathrm{fmt}} & \text{if $y_A$ follows the $\langle\texttt{think},\texttt{strategy},\texttt{answer}\rangle$ schema and $b(y_A)$ is extractable from }\strategyspace, \\
+    +r_{\mathrm{fmt}} & \text{if $y_A$ follows the prescribed schema and yields a valid } b(y_A),\\
     -r_{\mathrm{fmt}} & \text{otherwise.}
   \end{cases}
 \end{equation}
-Following the finding of~\citet{magic2025} that enforcing structured reasoning on the defender degrades general capabilities, $R_{\mathrm{fmt}}$ is applied only to the attacker.
+$R_{\mathrm{fmt}}$ is applied only to the attacker, since requiring structured reasoning of the defender is known to degrade general capability~\citep{magic2025}.
 
 \textbf{2. Harmfulness Reward ($R_{\mathrm{harm}}$).}
-We use Qwen3Guard~\citep{zhao2025qwen3guard} as the reward model in training and as the in-distribution safety judge in evaluation. $R_{\mathrm{harm}}$ is defined from the defender's perspective (safe responses are rewarded, unsafe ones are penalized) so that the zero-sum structure with the attacker is preserved:
+Qwen3Guard~\citep{zhao2025qwen3guard} serves as both the training-time reward model and the in-distribution safety judge; ``controversial'' responses are treated as unsafe to avoid rewarding ambiguous cases.
 \begin{equation}
   R_{\mathrm{harm}}(y_D) \;=\; \begin{cases}
     +r_{\mathrm{harm}} & \text{if $y_D$ is labeled safe},\\
     -r_{\mathrm{harm}} & \text{if $y_D$ is labeled unsafe or controversial.}
   \end{cases}
 \end{equation}
-Following MAGIC, ``controversial'' responses are treated as unsafe to avoid ambiguous safety cases being rewarded.
 
 \textbf{3. Refusal Reward ($R_{\mathrm{ref}}$).}
-To prevent the defender from collapsing into over-refusal, \method uses an identical refusal reward to MAGIC that jointly penalizes false refusals on benign prompts and false compliance with unsafe prompts:
+To prevent the defender from collapsing into over-refusal, we use a refusal reward that jointly penalizes false refusals on benign prompts and false compliance with unsafe ones:
 \begin{equation}
   R_{\mathrm{ref}}(x, y_D) \;=\; \begin{cases}
     +r_{\mathrm{ref}} & \text{if $x$ is unsafe and $y_D$ refuses,}\\
@@ -608,16 +575,16 @@ To prevent the defender from collapsing into over-refusal, \method uses an ident
 \end{equation}
 
 \textbf{4. Diversity Reward ($R_{\mathrm{div}}$).}
-The normalized marginal coverage gain of Eq.~\ref{eq:coverage-gain}, modulated by the success-aware coefficient $\lambda(x)$ of Eq.~\ref{eq:lambda}, is applied only to the attacker---encoding a strategy-level exploration pressure that has no defender analogue.
+The normalized marginal coverage gain (Eq.~\ref{eq:coverage-gain}), gated by $\lambda(x)$ in Eq.~\ref{eq:lambda}, is applied only to the attacker---a strategy-level exploration pressure with no defender analogue.
 
 \textbf{Final reward formulation.}
-The effectiveness component of the interaction remains zero-sum, while format and diversity are attacker-side regularizers. The total rewards for the defender and attacker are therefore
+The effectiveness component $R_{\mathrm{harm}}+R_{\mathrm{ref}}$ is strictly zero-sum, while $R_{\mathrm{fmt}}$ and $\lambda(x)R_{\mathrm{div}}$ are attacker-side regularizers that make the overall game \emph{general-sum}:
 \begin{align}
-  R_D &\;=\; R_{\mathrm{harm}}(y_D) + R_{\mathrm{ref}}(x, y_D), \\
-  R_A &\;=\; -R_D + R_{\mathrm{fmt}}(y_A) + \lambda(x)\cdot R_{\mathrm{div}}(x).
+  R_D &\;=\; R_{\mathrm{harm}}(y_D) \;+\; R_{\mathrm{ref}}(x, y_D), \\
+  R_A &\;=\; \underbrace{-R_D}_{\text{zero-sum effectiveness}} \;+\; R_{\mathrm{fmt}}(y_A) \;+\; \lambda(x)\cdot R_{\mathrm{div}}(x).
   \label{eq:reward-A}
 \end{align}
-All three base rewards $\{R_{\mathrm{harm}}, R_{\mathrm{ref}}, R_{\mathrm{fmt}}\}$ reduce to MAGIC's reward design when the diversity term is removed, so the $R_{\mathrm{div}}$ addition is strictly the contribution of \method. The full GRPO objective applied to $R_A$ and $R_D$ is standard and is reproduced in Appendix~\ref{apdx:algorithm}.
+The GRPO loss applied to $R_A$ and $R_D$ is standard and reproduced in Appendix~\ref{apdx:algorithm}.
 
 
 % ==========================================================
@@ -628,7 +595,7 @@ All three base rewards $\{R_{\mathrm{harm}}, R_{\mathrm{ref}}, R_{\mathrm{fmt}}\
 
 % [Section 4 引子段] 大意：沿 MAGIC 编排把实验分为 defender 主实验 + attacker 主实验两大块；multi-turn 与完整 ablation 下放到附录；保持 "evaluate / study" 口径避免 overclaim。
 % 中文对应内容：我们把 DACE 的实验分成两大块：(i) defender 侧主实验通过 RQ1-RQ3 回答 "是否在更广的安全 benchmark 上降低 ASR 且不诱发过拒"、"通用能力是否保持"、"在强自动红队（含 MAJIC 等组合攻击）下是否继续鲁棒"；(ii) attacker 侧主实验通过 RQ4-RQ5 回答 "attacker 是否能跨 defender 迁移保持攻击力"、"DACE attacker 的策略覆盖与文本多样性是否真优于 MAGIC"。multi-turn 评测与完整 ablation 下放到附录 F.1 / F.2；表头与 MAGIC 保持一致以便并排阅读。凡能对齐 MAGIC 已公开数字的行（MAGIC / Self-RedTeam / 原 instruct 模型）已预先填入 MAGIC 论文的数字；DACE 自身行与新增 MAJIC 列保持 `--`，等评测 pipeline 完成后填入。分析段统一采用 "we evaluate / we study / we expect" 的口径，不预先做完成式宣称。
-We structure the DACE experiments into two main blocks. \textbf{Defender-side} evaluation answers RQ1--RQ3 over safety (Tab.~\ref{tab:evaluation_main}), general capability (Tab.~\ref{tab:general_cap}), and strong out-of-distribution automated red-teaming including the most recent composition-heavy attacker MAJIC (Tab.~\ref{tab:harmbench_generalization}). \textbf{Attacker-side} evaluation answers RQ4--RQ5 over transferability across unseen defenders (Tab.~\ref{tab:attacker-transfer}) and multi-level strategy/text diversity against MAGIC as the co-evolution predecessor (Tab.~\ref{tab:attacker-diversity}, Fig.~\ref{fig:coevo-and-pool}). Multi-turn evaluation and full ablation studies are reported in Appendix~\ref{apdx:expanded-results}. Table headers follow MAGIC~\citep{magic2025} so that side-by-side reading is straightforward: cells that coincide with MAGIC's already-published rows are pre-filled with MAGIC's numbers, whereas \method cells and the newly added MAJIC column are left as ``--'' pending our evaluation pipeline. The analysis prose uses an \emph{evaluation} framing (``we study'', ``we examine'') rather than pre-committing to specific comparisons.
+We structure the DACE experiments into two main blocks. \textbf{Defender-side} evaluation answers RQ1--RQ3 over safety (Tab.~\ref{tab:evaluation_main}), general capability (Tab.~\ref{tab:general_cap}), and strong out-of-distribution automated red-teaming including the most recent composition-heavy attacker MAJIC (Tab.~\ref{tab:harmbench_generalization}). \textbf{Attacker-side} evaluation answers RQ4--RQ5 over transferability across unseen defenders (Tab.~\ref{tab:attacker-transfer}) and multi-level strategy/text diversity (Tab.~\ref{tab:attacker-diversity}, Fig.~\ref{fig:coevo-and-pool}). Multi-turn evaluation and full ablation studies are reported in Appendix~\ref{apdx:expanded-results}. Baseline rows that coincide with prior published numbers are pre-filled for side-by-side reading, whereas \method cells and the newly added MAJIC column are left as ``--'' pending our evaluation pipeline. The analysis prose uses an \emph{evaluation} framing (``we study'', ``we examine'') rather than pre-committing to specific comparisons.
 
 % ----------------------------------------------------------
 % 4.1 Experimental Setup
@@ -639,7 +606,7 @@ We structure the DACE experiments into two main blocks. \textbf{Defender-side} e
 % [段 · Models & Baselines] 大意：与 MAGIC 的 baseline 对齐，主表覆盖 Qwen2.5-7B 与 Llama3.1-8B 两个 backbone；不比 SSP，保留 Self-RedTeam / MAGIC 作为主要对抗协同演化基线，SmoothLLM / Self-Eval 作为 inference-time 防御对照。
 % 中文对应内容：主表（Table 1 / 2 / 3）覆盖两个 backbone：Qwen2.5-7B-Instruct 与 Llama3.1-8B-Instruct；Qwen2.5-14B-Instruct 的扩展在附录 F.3。基线包括 (1) 原 instruct 模型；(2) Self-RedTeam（零和自博弈 RL）；(3) MAGIC（非对称序贯博弈）；以及 inference-time 防御 (4) SmoothLLM 与 (5) Self-Eval。所有协同演化基线共享 attacker 种子集、defender 基模与判官（Qwen3Guard 训练 + GPT-4o OpenRT 评估），以消除 pipeline 带来的混淆。
 \textbf{Models and baselines.}\quad
-We use \textbf{Qwen2.5-7B-Instruct}~\citep{yang2025qwen25} and \textbf{Llama3.1-8B-Instruct}~\citep{touvron2023llama} as the two defender backbones in the main tables, and report extended results for Qwen2.5-14B-Instruct in Appendix~\ref{apdx:expanded-results}. We compare \method against: (1) the original instruction-tuned model, (2) \textbf{Self-RedTeam}~\citep{liu2025chasing}, (3) \textbf{MAGIC}~\citep{magic2025}, and the inference-time defenses (4) \textbf{SmoothLLM}~\citep{robey2023smoothllm} and (5) \textbf{Self-Eval}~\citep{phute2023llm}. Baselines are aligned with MAGIC's protocol so that the rows in Tables~\ref{tab:evaluation_main}--\ref{tab:harmbench_generalization} can be read side-by-side with MAGIC's reported numbers. To keep the comparison apples-to-apples, all co-evolution baselines use the same attacker SFT seed set, the same defender base model, and the same judges (Qwen3Guard~\citep{zhao2025qwen3guard} in training; GPT-4o as an independent judge in strong OOD attacker evaluations).
+We use \textbf{Qwen2.5-7B-Instruct}~\citep{yang2025qwen25} and \textbf{Llama3.1-8B-Instruct}~\citep{touvron2023llama} as the two defender backbones in the main tables, and report extended results for Qwen2.5-14B-Instruct in Appendix~\ref{apdx:expanded-results}. We compare \method against: (1) the original instruction-tuned model; (2) \textbf{Self-RedTeam}~\citep{liu2025chasing}, a zero-sum self-play RL framework with a Nash-equilibrium objective that shares parameters between attacker and defender; (3) \textbf{MAGIC}~\citep{magic2025}, the closest co-evolution predecessor, which models the interaction as an \emph{asymmetric sequential game} with an SPNE solution concept but leaves attack diversity implicit (no explicit strategy space or coverage reward) and maintains no replay mechanism, so it cannot directly address either the attack-strategy-collapse or the defense-adversarial-forgetting pathology formalized in \S\ref{sec:formalization}; and the inference-time defenses (4) \textbf{SmoothLLM}~\citep{robey2023smoothllm} and (5) \textbf{Self-Eval}~\citep{phute2023llm}, which apply safety constraints at generation time without adversarial co-training. Baselines are aligned with MAGIC's protocol so that the rows in Tables~\ref{tab:evaluation_main}--\ref{tab:harmbench_generalization} can be read side-by-side with MAGIC's reported numbers. To keep the comparison apples-to-apples, all co-evolution baselines use the same attacker SFT seed set, the same defender base model, and the same judges (Qwen3Guard~\citep{zhao2025qwen3guard} in training; GPT-4o as an independent judge in strong OOD attacker evaluations).
 
 % [段 · Training dataset] 按用户要求补充，参考 MAGIC 写法。
 \label{sec:exp-data}
@@ -720,7 +687,7 @@ Method
 
 % [段 · RQ1 解读 · 软] 保持 planned / expected 语气，避免 overclaim；两 backbone 读者都会关心。
 % 中文对应内容：我们期望 DACE 在 adversarial harmful benchmark（WG-Test adv、WJB adv、HarmBench adv、DAN 等）上相比 MAGIC 取得进一步下降的 ASR，同时在 benign benchmark（XSTest Comply、WJB benign ASR）上保持与 MAGIC 同量级的合规率，两个 backbone 上的趋势一致——这与 §2 双病态的形式化结论一致：把坍缩的 attacker 推向策略空间中更广的区域等价于把 defender 训练在更均衡的攻击分布上，从而同时提升鲁棒性与不诱发过拒。
-We evaluate the two backbones in parallel; we expect \method to further lower ASR on adversarial harmful splits (WG:Test adv, WJB adv, HarmBench adv, DAN) without degrading benign compliance (XSTest Comply, WJB benign ASR). Pushing the attacker toward broader strategy coverage is equivalent to training the defender on a more uniform attack distribution, and the refusal reward plus the dual success definition (\S\ref{sec:method-attacker}) explicitly protect benign compliance. The MAGIC rows in Table~\ref{tab:evaluation_main} are reproduced from MAGIC~\citep{magic2025} so that \method's improvements can be read directly against the strongest co-evolution predecessor.
+We evaluate the two backbones in parallel; we expect \method to further lower ASR on adversarial harmful splits (WG:Test adv, WJB adv, HarmBench adv, DAN) without degrading benign compliance (XSTest Comply, WJB benign ASR). Pushing the attacker toward broader strategy coverage is equivalent to training the defender on a more uniform attack distribution, and the refusal reward plus the dual success definition (\S\ref{sec:method-attacker}) explicitly protect benign compliance.
 
 
 \begin{rqbox}
@@ -754,7 +721,7 @@ Method & \multicolumn{2}{c}{IFEval} & ARC-C & GPQA & MMLU & AlpacaEval 2 \\
 \end{table*}
 
 % 中文对应内容：我们期望 DACE 的通用能力与 instruction-tuned 基线及 MAGIC 差距保持在一两个点以内，GPQA 等需要细分推理的测试上甚至可能受益于更结构化的策略监督。
-We examine whether the additional diversity reward and replay mechanism harm instruction following, reasoning, or general knowledge. Given that \method only adds attacker-side regularization and a replay mini-batch to the defender, we expect the general capability to remain within a narrow range of MAGIC, consistent with MAGIC's reported result that adversarial co-training with only $R_{\mathrm{harm}} + R_{\mathrm{ref}}$ preserves general capability.
+We examine whether the additional diversity reward and replay mechanism harm instruction following, reasoning, or general knowledge. Given that \method only adds attacker-side regularization and a replay mini-batch to the defender, we expect general capability to remain within a narrow range of the co-evolution baselines, consistent with prior observations~\citep{magic2025} that adversarial co-training with safety-only rewards preserves downstream capability.
 
 
 \begin{rqbox}
@@ -902,13 +869,13 @@ MAGIC last 15 steps ($\sim$3{,}840) & -- & -- & -- & -- & -- & -- & -- \\
     \subcaption{Final replay pool: $12\times10$ strategy distribution with posterior harmfulness.}
     \label{fig:pool-dist}
   \end{minipage}
-  \caption{\textbf{Co-evolution and replay-pool visualisation.} \textbf{Left:} $N\times N$ cross-evaluation heatmap between \method attacker checkpoints (rows) and \method defender checkpoints (columns); we report ASR on 320 HarmBench seeds, following MAGIC's Figure~3 protocol, to visualise joint co-evolution and convergence. \textbf{Right:} cell colour encodes the number of archived attacks falling into each $(s, c)$ cell of the $12\times10$ strategy grid in \method's final replay pool; cell annotation shows the Beta--Bernoulli posterior mean $\hat p = (\alpha + s_i)/(\alpha + \beta + s_i + f_i)$ aggregated over the cell's samples, so that breadth (colour) and persistent threat level (annotation) can be read jointly. Both panels are rendered from training logs at camera-ready time; the figure is a sized placeholder here.}
+  \caption{\textbf{Co-evolution and replay-pool visualisation.} \textbf{Left:} $N\times N$ cross-evaluation heatmap between \method attacker checkpoints (rows, earliest $\to$ latest top-to-bottom) and \method defender checkpoints (columns, earliest $\to$ latest left-to-right); we report ASR on 320 HarmBench seeds, following MAGIC's Figure~3 protocol. The diagonal visualises joint co-evolution convergence. The \emph{upper-triangular region}, read \emph{column-by-column}, corresponds to a fixed late-round defender evaluated against progressively older attacker checkpoints; when the entries in such a column remain uniformly low---i.e.\ a late-round defender keeps suppressing \emph{both} fresh and historical attack distributions---the column is the empirical realisation of a bounded forgetting statistic $F(t_0, t)$ in Definition~\ref{def:forgetting}, and is thus the direct evidence that the Bayesian replay pool of \S\ref{sec:method-replay} prevents the defender from drifting away from earlier attack modes. \textbf{Right:} cell colour encodes the number of archived attacks falling into each $(s, c)$ cell of the $12\times10$ strategy grid in \method's final replay pool; cell annotation shows the Beta--Bernoulli posterior mean $\hat p = (\alpha + s_i)/(\alpha + \beta + s_i + f_i)$ aggregated over the cell's samples, so that breadth (colour) and persistent threat level (annotation) can be read jointly. Both panels are rendered from training logs at camera-ready time; the figure is a sized placeholder here.}
   \label{fig:coevo-and-pool}
 \end{figure}
 
 % [段 · RQ5 分析] 大意：同时解读 Table 5 和 Figure 3 左右两面板；把 DACE 多样性领先解释为 (1) 策略层覆盖 (Coverage / Shannon H / QD-Score) 领先 MAGIC；(2) 语义/文本层不牺牲 (SBERT cos 不显著升高、Self-BLEU 不显著升高)；(3) 最终 replay pool 在去重后仍保持高覆盖说明贝叶斯 archive 本身承担了一个 "strategy-indexed 攻击基准" 的角色，可复用作发布资源。
 % 中文对应内容：Table 5 的三行对比回答 RQ5：MAGIC 行（last-15-steps 训练历史）代表协同演化但不做多样性驱动的对照；DACE last-15-steps 行代表策略覆盖奖励开启后的训练流；DACE replay pool 行代表整个训练历史在贝叶斯过滤后的累积。我们期望 DACE 在策略层三指标上明显领先 MAGIC，同时在 SBERT cosine / Self-BLEU 上至少不退化——这正是 TriPlay-RL "换皮不换招" 问题的反面：真实的多样性必须同时出现在策略层和文本层。Figure 3 左面板展示协同演化在接近训练尾部收敛至稳定区域；右面板展示 DACE 最终 replay pool 同时拥有广覆盖与高有害性，支撑 §3.4 贝叶斯回放机制的有效性。详细多层次多样性（D1/D2/D3 完整指标）与 per-benchmark 分解见附录~\ref{apdx:expanded-results}。
-Table~\ref{tab:attacker-diversity} compares \method to MAGIC along three orthogonal axes: strategy-grid coverage (Coverage, Shannon entropy, QD-Score), semantic distance (SBERT cosine), and textual fingerprint (Self-BLEU, Distinct-2, $n$-gram entropy). We expect \method to lead MAGIC at the strategy level by a substantial margin while matching or exceeding it at the semantic / textual level---this is the empirical counterpart of TriPlay-RL's ``new skin, same trick'' pattern~\citep{triplayrl2026}: genuine diversity must surface at \emph{both} the strategy and the text level. The third row further reports the final \method replay pool, which retains broad coverage even after Beta--Bernoulli-driven pruning, supporting our claim that the archive itself functions as a strategy-indexed jailbreak benchmark (\S\ref{sec:method-replay}). Fig.~\ref{fig:coevo-and-pool} (left) visualises the co-evolution equilibrium reached at the end of training; the right panel shows that \method spreads successful attacks across the $12\times10$ grid while preserving high posterior harmfulness in each populated cell, jointly motivating the strategy-level coverage reward and the Bayesian replay design of \S\ref{sec:method}.
+Table~\ref{tab:attacker-diversity} compares \method to MAGIC along three orthogonal axes: strategy-grid coverage (Coverage, Shannon entropy, QD-Score), semantic distance (SBERT cosine), and textual fingerprint (Self-BLEU, Distinct-2, $n$-gram entropy). We expect \method to lead MAGIC at the strategy level by a substantial margin while matching or exceeding it at the semantic / textual level---this is the empirical counterpart of TriPlay-RL's ``new skin, same trick'' pattern~\citep{triplayrl2026}: genuine diversity must surface at \emph{both} the strategy and the text level. The third row further reports the final \method replay pool, which retains broad coverage even after Beta--Bernoulli-driven pruning, supporting our claim that the archive itself functions as a strategy-indexed jailbreak benchmark (\S\ref{sec:method-replay}). Fig.~\ref{fig:coevo-and-pool} (left) additionally closes the loop on \emph{defense adversarial forgetting} introduced in Definition~\ref{def:forgetting}: reading each column in the upper-triangular region top-to-bottom traces a fixed late-round defender against progressively older attacker checkpoints, so columns that stay uniformly dark constitute the direct evidence that the Bayesian replay pool of \S\ref{sec:method-replay} keeps the defender from drifting away from earlier attack modes as the attacker evolves. The right panel shows that \method spreads successful attacks across the $12\times10$ grid while preserving high posterior harmfulness in each populated cell, jointly motivating the strategy-level coverage reward and the Bayesian replay design of \S\ref{sec:method}.
 
 
 
@@ -964,30 +931,31 @@ Algorithm~\ref{alg:dace-full} gives the full pseudocode of \method, exposing all
     \STATE Initialize archive $\archive \leftarrow \emptyset$; strategy-count histogram $\mathbf{n}\in\mathbb{N}^{|\strategyspace|}\leftarrow\mathbf{0}$.
     \FOR{round $k=1,\dots,K$}
       \FOR{each $x_i \in \archive$}
-        \STATE $s_i \leftarrow \gamma\,s_i;\ f_i \leftarrow \gamma\,f_i$ \hfill\textit{time decay (Eq.~\ref{eq:time-decay})}
+        \STATE $s_i \leftarrow \gamma\,s_i;\ f_i \leftarrow \gamma\,f_i$ \hfill\textit{time decay of pseudo-counts}
       \ENDFOR
-      \STATE \textit{\# Defender optimization (fix $\piA$)}
+      \STATE \textit{\# Stage 1: Attacker optimization (fix $\piD$)}
       \FOR{step $t=1,\dots,T$}
-        \STATE Sample seeds $\{q_j\}$; attacker produces one rewrite per seed; let $\mathrm{fresh}$ be the resulting batch of $B_{\mathrm{train}}$ attacks.
-        \STATE For each entry in $\archive$, draw $\tilde p_i \sim \mathrm{Beta}(\alpha+s_i,\beta+f_i)$; let $\mathcal{D}_{\mathrm{replay}}\leftarrow \operatorname{Top-}B_{\mathrm{replay}}(\{\tilde p_i\})$ \hfill\textit{Eq.~\ref{eq:thompson}}
-        \STATE Defender generates $G$ rollouts per attack in $\mathrm{fresh}\cup\mathcal{D}_{\mathrm{replay}}$; compute $R_D$.
-        \STATE Update $\piD$ by GRPO on $R_D$ with the mixed mini-batch.
-        \FOR{each $x_i \in \mathcal{D}_{\mathrm{replay}}$}
-          \STATE Update posterior by Eq.~\ref{eq:beta-update} using the defender verdict.
-          \IF{$\hat p_i < \tau_{\mathrm{prune}}$ \textbf{and} $s_i + f_i > n_{\min}$}
-            \STATE Remove $x_i$ from $\archive$; decrement $\mathbf{n}[b(x_i)]$ \hfill\textit{Eq.~\ref{eq:prune}}
-          \ENDIF
-        \ENDFOR
-        \STATE For every new success in $\mathrm{fresh}$ not already in $\archive$, insert $(x, b(x), s{=}1, f{=}0)$; increment $\mathbf{n}$.
-      \ENDFOR
-      \STATE \textit{\# Attacker optimization (fix $\piD$)}
-      \FOR{step $t=1,\dots,T$}
-        \STATE Sample seeds $\{q_j\}$; attacker generates $G$ structured rewrites per seed.
+        \STATE Sample seeds $\{q_j\}\sim\mathcal{Q}$; attacker generates $G$ structured rewrites per seed.
         \STATE Extract $b(x)$ by regex + fuzzy substring; obtain $\piD(x)$ and judge verdicts.
         \STATE Compute $R_{\mathrm{div}}(x)$ using Eq.~\ref{eq:coverage-gain} with the batch-shared denominator.
         \STATE Compute $\lambda(x)$ (Eq.~\ref{eq:lambda}); form $R_A$ (Eq.~\ref{eq:reward-A}).
         \STATE Update $\piA$ by GRPO on $R_A$ within each group.
-        \STATE For every successful $x$ not already in $\archive$: insert entry; increment $\mathbf{n}[b(x)]$.
+        \STATE For every successful $x$ not already in $\archive$: insert entry with $(s{=}1, f{=}0)$; increment $\mathbf{n}[b(x)]$.
+      \ENDFOR
+      \STATE \textit{\# Stage 2: Defender optimization on mixed mini-batch (fix $\piA$)}
+      \FOR{step $t=1,\dots,T$}
+        \STATE \textit{Fresh attacks:} sample seeds $\{q_j\}$; attacker produces one rewrite per seed; let $\mathcal{D}_{\mathrm{new}}$ be the resulting batch of $B_{\mathrm{train}}$ attacks.
+        \STATE \textit{Replay attacks:} for each entry in $\archive$, draw $\tilde p_i \sim \mathrm{Beta}(\alpha+s_i,\beta+f_i)$; let $\mathcal{D}_{\mathrm{replay}}\leftarrow \operatorname{Top-}B_{\mathrm{replay}}(\{\tilde p_i\})$ \hfill\textit{Eq.~\ref{eq:thompson}}
+        \STATE Defender generates $G$ rollouts per attack in $\mathcal{D}_{\mathrm{train}}\!=\!\mathcal{D}_{\mathrm{new}}\cup\mathcal{D}_{\mathrm{replay}}$; compute $R_D$.
+        \STATE Update $\piD$ by GRPO on $R_D$ with the mixed mini-batch of size $B_{\mathrm{train}}+B_{\mathrm{replay}}$.
+        \FOR{each $x_i \in \mathcal{D}_{\mathrm{replay}}$}
+          \STATE If any defender rollout was judged unsafe, $s_i\leftarrow s_i+1$; else $f_i\leftarrow f_i+1$. \hfill\textit{conjugate update}
+          \STATE Recompute $\hat p_i$ via Eq.~\ref{eq:posterior}.
+          \IF{$\hat p_i < \tau_{\mathrm{prune}}$ \textbf{and} $s_i + f_i > n_{\min}$}
+            \STATE Remove $x_i$ from $\archive$; decrement $\mathbf{n}[b(x_i)]$ \hfill\textit{conservative pruning}
+          \ENDIF
+        \ENDFOR
+        \STATE For every new success in $\mathcal{D}_{\mathrm{new}}$ not already in $\archive$, insert $(x, b(x), s{=}1, f{=}0)$; increment $\mathbf{n}$.
       \ENDFOR
     \ENDFOR
     \RETURN $\piA, \piD, \archive$.
@@ -1018,6 +986,85 @@ Algorithm~\ref{alg:dace-full} gives the full pseudocode of \method, exposing all
     \bottomrule
   \end{tabular}
 \end{table}
+
+
+% ----------------------------------------------------------
+% A.1 GRPO Objective and Mixed-Batch Advantage Estimation
+% ----------------------------------------------------------
+\subsection{GRPO objective and mixed-batch advantage estimation}
+\label{apdx:grpo}
+
+% [App A.1 · GRPO 目标函数 + 混合 batch 的 per-prompt advantage 说明]
+% 中文对应内容：附录 A.1 给出 DACE 训练主循环中 GRPO 的完整目标函数并澄清一个工程关键点：在 defender 混合 batch 的 GRPO 更新下，advantage 是在每个 prompt 独立的 G 个 rollouts 内部归一化的，而不是在整个 batch 内跨 prompt 归一化。写作顺序：(1) 给出攻击者与防御者共享的 GRPO clipped surrogate loss；(2) 给出单 prompt 内 G 个候选响应的 advantage 公式；(3) 指出在混合 batch 中 D_new 与 D_replay 的样本难度存在系统差异（新攻击通常易通过、历史攻击通常更难），若跨 prompt 归一化会把难度差异吸收进 advantage 符号，导致"D_replay 的 rollouts 总是被推成正 advantage / D_new 的 rollouts 总是被推成负 advantage"的错误监督信号；(4) 我们严格按 per-prompt group 归一化，advantage 仅反映该 prompt 内部的相对好坏，天然免疫跨 prompt 难度扭曲；(5) 提一句实现参考 veRL 的 trainer.compute_grpo_advantages。
+We expand the compact pseudocode of Algorithm~\ref{alg:dace-full} with the explicit GRPO surrogate loss and, crucially, with the advantage-estimation rule that \method uses on the defender's mixed mini-batch. This clarifies a common implementation question: how does group-relative advantage interact with a batch whose prompts are of systematically different difficulty (fresh attacks vs.\ replayed historical attacks)?
+
+\paragraph{Shared GRPO objective.} Following~\citet{shao2024grpo, guo2025deepseek}, both the attacker update on $R_A$ and the defender update on $R_D$ minimise the clipped surrogate loss
+\begin{equation}
+  \mathcal{L}_{\mathrm{GRPO}}(\theta) \;=\; -\,\mathbb{E}_{\tau}\!\left[\frac{1}{G}\sum_{i=1}^{G}\Big(\min\!\big(\rho_i\,\hat A_i,\ \mathrm{clip}(\rho_i,\,1{-}\epsilon,\,1{+}\epsilon)\,\hat A_i\big) \;-\; \beta\,\KL\!\big(\pi_\theta\,\|\,\pi_{\mathrm{ref}}\big)\Big)\right],
+  \label{eq:grpo-loss}
+\end{equation}
+where $\rho_i = \pi_\theta(o_i\mid p)\,/\,\pi_{\mathrm{old}}(o_i\mid p)$ is the importance ratio for the $i$-th rollout $o_i$ generated from prompt $p$, $\hat A_i$ is its group-relative advantage, $\epsilon$ is the PPO-style clip range, and $\beta$ controls the KL anchor to the reference policy. For the attacker, $p$ is a seed query $q$ and $o_i$ is a rewrite $y_A^{(i)}$; for the defender, $p$ is an attack prompt $x_j\in\mathcal{D}_{\mathrm{train}}$ and $o_i$ is a response $y_D^{(i)}$.
+
+\paragraph{Per-prompt group-relative advantage.} \method estimates the advantage \emph{independently within each prompt's own $G$-rollout group}. Concretely, for each prompt $p$ in either $\mathcal{D}_{\mathrm{new}}$ or $\mathcal{D}_{\mathrm{replay}}$, the defender samples $G$ responses $\{y_D^{(i)}\}_{i=1}^G\sim\piD(\cdot\mid p)$, observes the per-response reward $r_i = R_D(p, y_D^{(i)})$, and sets
+\begin{equation}
+  \hat A_i(p) \;=\; \frac{r_i - \mu(p)}{\sigma(p) + \varepsilon_{\mathrm{adv}}},\qquad
+  \mu(p) = \tfrac{1}{G}\textstyle\sum_{k=1}^{G} r_k,\qquad
+  \sigma(p) = \sqrt{\tfrac{1}{G}\textstyle\sum_{k=1}^{G}(r_k - \mu(p))^2}.
+  \label{eq:grpo-adv}
+\end{equation}
+Equation~\ref{eq:grpo-adv} is evaluated \emph{per prompt}---i.e.\ $\mu(p), \sigma(p)$ are computed from the $G$ rollouts that share that prompt, not from the entire $(B_{\mathrm{train}}+B_{\mathrm{replay}})\cdot G$-sized mini-batch. The attacker update uses the same rule with $r_i$ replaced by $R_A(y_A^{(i)}, y_D^{(i)})$ and $p$ replaced by the seed query.
+
+\paragraph{Why this matters for the mixed batch.} Fresh attacks in $\mathcal{D}_{\mathrm{new}}$ and replayed attacks in $\mathcal{D}_{\mathrm{replay}}$ have \emph{systematically different expected reward distributions}: Thompson sampling biases $\mathcal{D}_{\mathrm{replay}}$ toward high-threat entries whose expected $R_D$ is lower than that of typical fresh attacks, while $\mathcal{D}_{\mathrm{new}}$ is dominated by the attacker's current easy-success modes. If advantages were instead normalised \emph{across} the full mini-batch, every rollout for a replayed prompt would tend to land below the global mean and receive a negative advantage, and every rollout for a fresh prompt would tend to land above the global mean and receive a positive advantage, regardless of \emph{within-prompt} quality. The policy gradient would then encode prompt difficulty rather than per-prompt response quality, contaminating both directions of learning. The per-prompt normalisation in Eq.~\ref{eq:grpo-adv} eliminates this confound: $\hat A_i(p)$ depends only on how the $i$-th response compares with its $G-1$ siblings for the same $p$, so fresh and replayed prompts contribute orthogonal learning signal to the shared GRPO update and the variance of the gradient estimator stays bounded by the within-group scale.
+
+\paragraph{Implementation note.} In veRL~\citep{sheng2025verl}, this is the default behaviour of \texttt{compute\_grpo\_advantages} when called with prompt-id grouping enabled; \method inherits this setting without modification. The mixed mini-batch is assembled at the dataloader level (\texttt{trainer.ppo.ray\_trainer}) so that rollouts belonging to the same prompt remain contiguous when advantages are scattered back to the loss.
+
+
+% ----------------------------------------------------------
+% A.2 KL-contraction interpretation (derivation deferred from §3.3)
+% ----------------------------------------------------------
+\subsection{KL-contraction interpretation of the normalized coverage gain}
+\label{apdx:kl-contraction}
+
+% [App A.1 · KL 视角完整推导] 中文对应内容：附录 A.1 给出正文 §3.3 中 KL 视角推导的完整形式。利用 H(p) = log|B| - D_KL(p||u)，原始边际熵增等价于加入样本前后 p_A 到均匀分布 u 的 KL 散度减少量：H(p_{A∪x}) - H(p_A) = D_KL(p_A||u) - D_KL(p_{A∪x}||u)。因此归一化覆盖增益 R_div 的含义是"该样本把 p_A 向 u 收缩的 KL 减少量占当前档案状态下单样本可达最大 KL 减少量的比例"（正截断除外）。两个对偶性质直接由 KL 散度的基本事实得到：(i) 对第 b 槽位概率的梯度 ∂ D_KL(p||u) / ∂ p_b = 1 + log p_b - log u_b 在低频槽位取得最大的下降，因此最大化 R_div 等价于沿 KL 最陡下降方向选择策略；(ii) 前向 KL 的 zero-avoiding 性质意味着 p_b → 0 时 KL → ∞，从而空白槽位对应最强的探索压力，与覆盖目标——不遗漏任何策略区域——完全一致。
+Using the identity $H(\mathbf{p}) = \log|\strategyspace| - \KL(\mathbf{p}\,\|\,\uniform)$ with $\uniform$ the uniform prior over the $120$-cell strategy space, the raw marginal entropy gain in Eq.~\ref{eq:coverage-gain} rewrites as
+\begin{equation}
+  H(\mathbf{p}_{\archive\cup\{x\}}) - H(\archivedist)
+  \;=\; \KL(\archivedist\,\|\,\uniform) - \KL(\mathbf{p}_{\archive\cup\{x\}}\,\|\,\uniform),
+  \label{eq:kl-identity}
+\end{equation}
+i.e., the single-step KL reduction toward $\uniform$. Before the positive clip in Eq.~\ref{eq:coverage-gain}, the normalized coverage gain $R_{\mathrm{div}}(x)$ is therefore the fraction of one-step KL contraction that $x$ achieves, relative to the best attainable single-sample contraction at the current archive state. Two properties follow directly from elementary facts about $\KL$:
+\begin{itemize}[leftmargin=*, topsep=2pt, itemsep=2pt]
+  \item \textbf{Steepest-descent direction.} The partial derivative of $\KL(\mathbf{p}\,\|\,\uniform)$ with respect to the mass on the $b$-th cell is $\partial_{p_b}\KL(\mathbf{p}\,\|\,\uniform) = 1 + \log p_b - \log u_b$, whose magnitude grows as $p_b \downarrow 0$. Selecting an under-populated cell therefore yields the steepest per-sample decrease in KL, which is the exact quantity the normalizer in Eq.~\ref{eq:coverage-gain} maximizes over $b$; so $R_{\mathrm{div}}(x) \to 1$ whenever $x$ lands in the currently sparsest cell.
+  \item \textbf{Zero-avoiding pressure.} Forward $\KL$ diverges as any $p_b \to 0$; consequently, cells that have never been visited carry the largest per-sample KL reduction potential, and $R_{\mathrm{div}}$ places the strongest exploration pressure on empty cells. This matches the coverage objective of Definition~\ref{def:collapse}---no strategy region should be structurally omitted---and complements the discrete grid by guaranteeing that even deep into training the attacker receives a non-vanishing signal to visit previously neglected regions.
+\end{itemize}
+The per-batch overhead of evaluating the normalizer is a single $\mathcal{O}(|\strategyspace|)=\mathcal{O}(120)$ sweep over cells, amortized across all samples in the group.
+
+
+% ----------------------------------------------------------
+% A.3 Bayesian replay: expanded derivations and corner cases
+% ----------------------------------------------------------
+\subsection{Bayesian adversarial replay: expanded details}
+\label{apdx:bayesian-replay}
+
+% [App A.2 · Bayesian replay 补充] 中文对应内容：附录 A.2 扩展正文 §3.4 的细节。(a) 后验方差 Var(p_i) = (α+s_i)(β+f_i) / ((α+β+s_i+f_i)^2 (α+β+s_i+f_i+1))——试验次数越多 variance 越小，自然量化置信度；(b) 时间衰减的信息论解读：衰减因子 γ 对应有效样本量 N_eff = (s_i+f_i)/(1-γ)，等价于在 N_eff 步后权重降到初始的 1/e；(c) Thompson 采样的收敛性：当 posterior 收敛到 p_i 的 delta 分布时，Top-B_replay 采样退化为确定性 top-B_replay，与 upper-confidence bandit 方法的渐近行为一致；(d) 剪枝的最坏情形分析：在 τ_prune=0.45, n_min=2 下，最早可能剪枝发生在 (s=0, f=3) 或 (s=1, f=4)，对应后验均值 1/5 = 0.20 或 2/7 ≈ 0.286，均安全地位于 τ_prune 以下。
+The main text (Section~\ref{sec:method-replay}) gives a compact description of the replay mechanism. Here we record the expanded derivations, closed forms, and corner-case analyses underpinning its default settings.
+
+\paragraph{Posterior variance and uncertainty quantification.}
+The closed-form variance of the Beta posterior in Eq.~\ref{eq:posterior} is
+\begin{equation}
+  \mathrm{Var}(p_i \mid s_i, f_i) \;=\; \frac{(\alpha+s_i)(\beta+f_i)}{(\alpha+\beta+s_i+f_i)^2\,(\alpha+\beta+s_i+f_i + 1)},
+  \label{eq:posterior-var}
+\end{equation}
+which is monotonically decreasing in the total trial count $s_i+f_i$. Entries with few trials therefore carry high variance by construction, and the Thompson-sampling step naturally re-examines them; entries with many trials concentrate near $\hat p_i$ and are selected deterministically. This is the structural advantage over the discrete-score update of~\citet{ssp2026}, which conflates few-trial and many-trial estimates.
+
+\paragraph{Effective sample size under exponential time decay.}
+The exponential discount $(s_i, f_i)\leftarrow(\gamma s_i, \gamma f_i)$ is equivalent to a sliding exponential window whose effective sample size is $N_{\mathrm{eff}} = 1/(1-\gamma)$; with $\gamma=0.90$, $N_{\mathrm{eff}}=10$ rounds, so evidence older than roughly ten rounds contributes less than $1/e$ of its original weight. Non-integer pseudo-counts remain well-defined because the Beta distribution is parameterized by arbitrary positive reals, and the conjugate update is unchanged.
+
+\paragraph{Worst-case pruning analysis.}
+With the default $\tau_{\mathrm{prune}}=0.45$ and $n_{\min}=2$, the earliest a pruning event can occur is at $(s_i, f_i)=(0, 3)$ or $(1, 4)$ (modulo time-decay fractions), giving $\hat p_i = 1/5=0.20$ or $\hat p_i=2/7\approx 0.286$---both safely below the threshold. Thus a single lucky refusal can \emph{never} prune an entry, and low-trial entries with sustained high posterior mean are explicitly protected. The converse bias---retaining too many low-threat entries---is controlled by the archive capacity (Table~\ref{tab:hyperparams}), after which an LRU-by-mean policy caps memory consumption.
+
+\paragraph{Thompson sampling limits.}
+As the posteriors concentrate ($N_{\mathrm{eff}} \uparrow$ without new evidence), each $\tilde p_i$ degenerates to its mean $\hat p_i$, so the Top-$B_{\mathrm{replay}}$ procedure reduces to a deterministic top-$B_{\mathrm{replay}}$ selection, matching the asymptotic behaviour of upper-confidence-bound bandits. In the opposite limit (all entries fresh), Thompson sampling is maximally exploratory and $\mathcal{D}_{\mathrm{replay}}$ is an approximately uniform sub-sample of the archive, so the replay schedule adapts continuously between exploration and exploitation without an explicit schedule hyperparameter.
 
 
 % ==========================================================
@@ -1506,8 +1553,43 @@ attack style: Technical Terms\\
 \textbf{Defender verdict}: \textit{\{e.g., refused / complied-unsafe / complied-safe\}}
 \end{tcolorbox}
 
+% [Case H.4 · Thompson-sampled long-tail replay / forgetting-prevented case skeleton]
+% 中文对应内容：Case H.4 用同一套 nested tcolorbox 结构展示一个"Thompson 采样成功回忆长尾漏洞并阻止对抗遗忘"的完整链条：(a) 该攻击在早期 round k=k_early 被 attacker 首次命中 defender；(b) 之后若干 round 内 defender 策略漂移，对类似新攻击表现优秀，但该历史攻击未被频繁回放；(c) 时间衰减把后验推回较高不确定性（方差扩大），Thompson 采样在 round k_late 以较高 sampled risk 值把该条目抽回 D_replay；(d) 再次对 defender 发起攻击，verdict 显示若无回放则 defender 重新被攻破（forgetting），有回放则 posterior 更新并让 defender 继续鲁棒。整个 case 是 §3.4 贝叶斯回放解决 forgetting 的一次完整演示，在定性上补强 Figure 3(a) 右上角三角区域的"列均匀低"现象。
+\begin{tcolorbox}[
+  float,
+  floatplacement=ht,
+  title={Case H.4: Thompson-sampled long-tail replay preventing adversarial forgetting (sanitized)},
+  colback=white,
+  colframe=black,
+  boxrule=0.8pt,
+  arc=2pt,
+  left=6pt,right=6pt,top=6pt,bottom=6pt
+]
+\textbf{Archive entry} $x_i$ (from Stage~1 at round $k_{\text{early}}$): \textit{\{sanitized historical attack prompt\}}
+
+\textbf{Declared strategy} $b(x_i)=(s, c)$: \textit{\{Hate --- Uncommon Dialects\}} \hfill\textit{\footnotesize long-tail cell}
+
+\textbf{Archive trajectory (sanitized counts):}
+\begin{itemize}[leftmargin=*, topsep=1pt, itemsep=1pt]
+  \item Round $k_{\text{early}}$: inserted with $(s_i, f_i) = (1, 0)$, posterior mean $\hat p_i = 2/3$.
+  \item Rounds $k_{\text{early}}+1,\dots,k_{\text{late}}-1$: $(s_i, f_i)$ decay geometrically with $\gamma=0.9$; posterior mean regresses toward $1/2$, posterior variance re-expands.
+  \item Round $k_{\text{late}}$: Thompson draw $\tilde p_i \gg \hat p_i$ due to widened variance; entry enters $\mathcal{D}_{\mathrm{replay}}$ and is re-issued to the evolved defender.
+\end{itemize}
+
+\textbf{Defender verdict at round $k_{\text{late}}$:}
+\begin{tcolorbox}[
+  colback=orange!15,colframe=orange!60!black,boxrule=0pt,
+  arc=2pt,left=6pt,right=6pt,top=6pt,bottom=6pt
+]
+\textit{Without replay (ablation)}: \{sanitized response showing partial compliance---\emph{defender has drifted} away from this attack mode\}.\\[1pt]
+\textit{With \method replay (ours)}: \{sanitized response showing robust refusal; posterior updated to $(s_i\!+\!1, f_i)$ or $(s_i, f_i\!+\!1)$ depending on outcome, so the entry either remains in active replay (if still threatening) or proceeds toward conservative pruning (if neutralized)\}.
+\end{tcolorbox}
+
+\textbf{Takeaway.} This case concretely instantiates the mechanism behind a uniformly dark column in the upper-triangular region of Fig.~\ref{fig:coevo-and-pool} (left): Thompson sampling on a time-decayed Beta--Bernoulli posterior automatically re-selects long-tail historical attacks that the defender may have drifted away from, so the defender is continuously rehearsed on them before any forgetting crystallizes.
+\end{tcolorbox}
+
 % 中文对应内容：这里补充一段 takeaway：三个 case 共同印证了 DACE attacker 能够在其指定的策略槽位内生成结构化、高质量的攻击，而不局限于浅层的文本变异。这与 Figure 1 的观察以及 §5.3 Table 5 中 DACE 显著高于 MAGIC 的 Coverage / QD-Score 趋势一致。完整 sanitized case 集合见随代码释出的 \texttt{eval-dace/qualitative/}。
-Across the three cases, \method's attacker effectively applies the selected $(s,c)$ strategy to generate structured, high-quality jailbreaks rather than relying on superficial textual variations. This focused exploitation explains \method's higher Coverage and QD-Score in Tab.~\ref{tab:attacker-diversity} and is consistent with the right panel of Fig.~\ref{fig:coevo-and-pool}. The full sanitized case set is released with the code under \texttt{eval-dace/qualitative/}.
+Across the four cases, \method's attacker effectively applies the selected $(s,c)$ strategy to generate structured, high-quality jailbreaks rather than relying on superficial textual variations (Cases H.1--H.3), while the unified archive and Thompson-sampled replay actively shield the defender from drifting away from long-tail historical attacks (Case H.4). This dual behaviour explains \method's higher Coverage and QD-Score in Tab.~\ref{tab:attacker-diversity} and is consistent with the right panel of Fig.~\ref{fig:coevo-and-pool}. The full sanitized case set is released with the code under \texttt{eval-dace/qualitative/}.
 
 
 % ==========================================================
