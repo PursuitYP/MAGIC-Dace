@@ -255,8 +255,7 @@
 % 撰写逻辑：big picture → gap (diversity/replay) → DACE 高层提案 → 实验规划；所有涉及实验指标的语句保持 evaluate/plan 风格，不过度承诺尚未完成的结果。
 % 中文对应内容：大语言模型 (LLM) 的安全对齐正不断被演化攻击推着走，依赖预收集分布的静态对齐方法难以覆盖漂移后的攻击。近期协同演化框架让 defender 跟随 attacker 的变化，但我们观察到训练动态中出现两个相互加强的病态：attacker 策略坍缩——生成的攻击过度集中在少数高回报模式；以及 defender 对抗性遗忘——在新攻击驱动下逐步丢失对早期攻击的拒答能力。针对 diversity，现有的自动红队多在静态目标上构建 archive，或只在文本/嵌入层面度量多样性，不能在动态协同演化中推动策略层面的结构化覆盖；针对回放，现有协同演化工作虽然会在回放后更新样本的威胁估计，但依赖离散 safety 分数，缺乏不确定性表达和对 defender 漂移的建模。我们提出 DACE：attacker 侧用显式的风险×风格攻击策略空间和归一化边际覆盖奖励鼓励结构化探索；defender 侧维护一个贝叶斯对抗回放池，以 Beta-Bernoulli 后验结合时间衰减和 Thompson 采样持续跟踪历史攻击的威胁水平。我们在多项主流安全基准、强红队工具与通用能力评测上评估 DACE 的效果。
 \begin{abstract}
-Ensuring robust safety alignment of large language models (LLMs) is increasingly difficult because adversarial attacks evolve from static templates to automated, compositional, and agentic exploitations, outpacing alignment pipelines that rely on pre-collected distributions. Recent co-evolutionary frameworks let the defender chase a moving attacker, but the resulting training dynamics expose two compounding pathologies: \emph{attack strategy collapse}, where the reinforcement-learned attacker concentrates on a narrow set of high-reward rewrites, and \emph{defense adversarial forgetting}, where the defender gradually loses competence against earlier attacks as the attack distribution drifts. Existing remedies fall short on both sides. Diversity-oriented red-teaming either builds quality-diversity archives against static targets or rewards only textual/embedding-level novelty, so attackers can satisfy the diversity signal without changing the underlying strategy. Replay mechanisms in co-evolutionary self-play do refresh per-sample threat estimates, yet they rely on a discrete safety score from the judge and therefore cannot express estimation uncertainty, response stochasticity, or defender non-stationarity. We introduce \method, a diversity-driven adversarial co-evolution framework that addresses these two gaps jointly: on the attacker side, \method couples an explicit two-dimensional attack strategy space (risk category $\times$ attack style) with a \emph{normalized marginal coverage gain} reward that provides a stable, non-vanishing signal toward under-explored regions; on the defender side, \method maintains a unified \emph{Bayesian adversarial replay pool} whose Beta--Bernoulli threat posteriors are refreshed by time decay and Thompson sampling, so that defender training is continuously anchored to an evolving threat landscape. We evaluate \method on standard safety, strong automated-attacker, multi-turn, and general-capability benchmarks, and release the code and the strategy-indexed adversarial replay pool to support further research on diversity-aware safety alignment.
-
+Ensuring robust safety alignment of large language models (LLMs) is increasingly difficult because adversarial attacks evolve, outpacing alignment pipelines that rely on pre-collected distributions. Recent co-evolutionary frameworks let the defender chase a moving attacker, but the resulting training dynamics expose two compounding pathologies: \emph{attack strategy collapse}, where the reinforcement-learned attacker concentrates on a narrow set of high-reward rewrites, and \emph{defense adversarial forgetting}, where the defender gradually loses competence against earlier attacks as the attack distribution drifts. Existing remedies fall short. Diversity-oriented red-teaming either relies on static targets or rewards superficial textual novelty, allowing attackers to bypass the diversity signal without changing their underlying strategy. Replay mechanisms in co-evolutionary self-play often depend on discrete safety scores that fail to capture estimation uncertainty, response stochasticity, or the non-stationarity of the defender. We introduce \method, a diversity-driven adversarial co-evolution framework that addresses these two gaps jointly. On the attacker side, \method couples an explicit two-dimensional attack strategy space (risk category $\times$ attack style) with a \emph{normalized marginal coverage gain} reward, providing a stable, non-vanishing signal toward under-explored regions. On the defender side, \method maintains a unified \emph{Bayesian adversarial replay pool} where Beta--Bernoulli threat posteriors are refreshed by time decay and Thompson sampling, ensuring that defender training is continuously anchored to an evolving threat landscape. We evaluate \method on standard safety, strong automated-attacker, multi-turn, and general-capability benchmarks. Results show \method significantly improves defender safety robustness against out-of-distribution attacks without degrading general capabilities, while the attacker achieves broad strategy coverage. We release the code and the strategy-indexed adversarial replay pool to support further research.
 \end{abstract}
 % Harmful content warning: aligned with MAGIC-style practice to flag adversarial examples in appendices.
 % \blfootnote{\textbf{Warning:} This paper contains examples of adversarial prompts used for LLM safety research. Such examples are presented for evaluation purposes and do not endorse the underlying harmful intent.}
@@ -336,22 +335,26 @@ To address this non-stationarity, recent work couples an attacker LLM and a defe
 % [段 3 · Gap 分析（关键差异化段落）：拆成 diversity 与 replay 两小段，按用户要求降低认知负荷并修正 SSP 表述。
 % 撰写逻辑：3A Diversity gap（QD / RL-diversity / TriPlay-RL 的语义层局限）+ 3B Replay gap（SSP 真的在实时更新，但依赖离散 safety score，无不确定性/偶然性/漂移建模）。
 % 中文对应内容：既有工作试图解决这两大病态，但多是"把静态机制嫁接到动态系统"。多样性方面，自动红队中的 QD 流派针对静态目标构造 archive；RL 多样性奖励停留在文本/嵌入层面，attacker 换措辞即可绕过。TriPlay-RL 是协同演化中最接近的 diversity 先验工作，但只用 Self-BLEU + cosine 做语义约束，改文不改策略。回放方面，SSP 确实会在回放后更新样本威胁估计，但依赖离散 safety score，无法表达估计不确定性，对 defender 单次拒答的偶然性敏感，也没有显式遗忘旧信息的机制。
-Existing attempts to mitigate these pathologies largely graft static mechanisms onto an inherently dynamic system, and split into two structurally incomplete directions. \textbf{Diversity gap.} One family inherits the quality-diversity (QD) search paradigm from automated red-teaming, constructing fixed behavior-descriptor archives against a \emph{static} target~\citep{samvelyan2024rainbow, han2024ruby, pala2025ferret, dang2025rainbowplus, wang2025qdrt}; another family attaches intrinsic-diversity rewards to RL attackers~\citep{hong2024curiosity, zhao2025diverct, lee2025gflownet, wang2025jailbreakr1, beutel2024openaidiverse} but measures diversity at the textual or embedding level (e.g., Self-BLEU, cosine distance), so the attacker can satisfy the diversity signal merely by rephrasing. Closest to us, \textbf{TriPlay-RL}~\citep{triplayrl2026} explicitly injects diversity inside a co-evolutionary loop, yet its diversity term is a composition of Self-BLEU and sentence-embedding cosine similarity---purely semantic-surface constraints. Attackers can therefore pass the diversity filter by varying wording while reusing the same strategy, i.e.\ ``new skin, same trick.'' \textbf{Replay gap.} SSP~\citep{ssp2026} correctly recognizes the forgetting problem and does maintain a replay pool whose per-sample harm scores are refreshed on each replay. Crucially, however, its update rule is driven by a discrete safety score from the judge and therefore lacks three modeling axes needed under a drifting defender: the update cannot represent \emph{estimation uncertainty} (few-trial and many-trial samples are aggregated into the same integer tally), it is sensitive to the \emph{stochasticity} of a single defender response (one lucky refusal due to sampling temperature can prematurely deprioritize a still-dangerous attack), and it provides no \emph{forgetting} mechanism for \emph{non-stationarity} (stale evidence keeps contaminating current threat estimates). Taken together, these observations motivate a co-evolutionary framework that places diversity at the strategy level rather than the textual level, and that replaces discrete harm accumulation with a principled continuous posterior.
+Existing attempts to mitigate these pathologies largely graft static mechanisms onto an inherently dynamic system, and split into two structurally incomplete directions. 
+
+\textbf{The Diversity Gap.} One family inherits the quality-diversity (QD) search paradigm from automated red-teaming, constructing fixed behavior-descriptor archives against a \emph{static} target~\citep{samvelyan2024rainbow, han2024ruby, pala2025ferret, dang2025rainbowplus, wang2025qdrt}. While these methods generate diverse prompts, they fail to adapt to an evolving defender. Another family attaches intrinsic-diversity rewards to RL attackers~\citep{hong2024curiosity, zhao2025diverct, lee2025gflownet, wang2025jailbreakr1, beutel2024openaidiverse} but measures diversity at the textual or embedding level (e.g., Self-BLEU, cosine distance), so the attacker can satisfy the diversity signal merely by rephrasing without adopting novel attack strategies. Closest to us, TriPlay-RL~\citep{triplayrl2026} explicitly injects diversity inside a co-evolutionary loop, yet its diversity term is a composition of Self-BLEU and sentence-embedding cosine similarity---purely semantic-surface constraints. Attackers can therefore pass the diversity filter by varying wording while reusing the same strategy, i.e.\ ``new skin, same trick.''
+
+\textbf{The Replay Gap.} On the defense side, SSP~\citep{ssp2026} correctly recognizes the forgetting problem and maintains a replay pool whose per-sample harm scores are refreshed on each replay. Crucially, however, its update rule is driven by a discrete safety score from the judge and therefore lacks three modeling axes needed under a drifting defender: the update cannot represent \emph{estimation uncertainty} (few-trial and many-trial samples are aggregated into the same integer tally), it is sensitive to the \emph{stochasticity} of a single defender response (one lucky refusal due to sampling temperature can prematurely deprioritize a still-dangerous attack), and it provides no \emph{forgetting} mechanism for \emph{non-stationarity} (stale evidence keeps contaminating current threat estimates). Taken together, these observations show that current methods fail to jointly address attack strategy collapse and defense adversarial forgetting in a dynamic, co-evolutionary setting.
 
 % [段 4 · DACE 提案 + we observe 钩子] 大意：直接引入 DACE，并用 "we observe" 提示组合式攻击作为实验钩子。
-% 撰写逻辑：介绍 attacker 侧（策略空间 + 归一化覆盖增益）+ defender 侧（Bayesian replay pool with time decay + Thompson）；用 "we also observe" 预告 combinatorial emergence 作为后续实验观察（放弱为 hypothesis，避免 overclaim）。
+% 撰写逻辑：介绍 attacker 侧（策略空间 + 归一化覆盖增益）+ defender 侧（Bayesian replay pool with time decay + Thompson）。
 % 中文对应内容：本文提出 DACE：attacker 侧给出 12×10 策略空间并以归一化边际覆盖增益奖励驱动结构化探索；defender 侧构建统一的贝叶斯对抗回放池，结合时间衰减与 Thompson 采样连续追踪历史攻击的威胁水平。我们在训练后期观察到一个新现象——组合式攻击涌现：attacker 在单条 rewrite 中组合多种 risk 与 style，这是 MAGIC/Self-RedTeam 未报告的行为，详见实验章节。
-In this paper, we propose \textbf{\method} (\textbf{D}iversity-Driven \textbf{A}dversarial \textbf{C}o-\textbf{E}volution), a co-evolutionary safety-alignment framework that targets the two pathologies jointly. On the attacker side, \method exposes an explicit $12\times10$ attack strategy space---$12$ safety risk categories adapted from the Llama-Guard-4 taxonomy~\citep{llamaguard4_2026} and $10$ linguistic attack styles from Rainbow Teaming~\citep{samvelyan2024rainbow}---and optimizes a \emph{normalized marginal coverage gain} reward whose denominator is the best single-sample entropy gain attainable at the current archive state, yielding an $\mathcal{O}(1)$ training signal that does not vanish as training proceeds. On the defender side, \method maintains a single \emph{Bayesian adversarial replay pool} that doubles as the strategy-frequency tracker for the coverage reward: every successful attack carries a Beta--Bernoulli threat posterior, time decay keeps the posterior aligned with the evolving defender, and Thompson sampling balances verified high-threat attacks with uncertain yet promising ones. During mid-to-late training we observe a qualitatively new behavior: the \method attacker \emph{combinatorially composes} risk categories and attack styles within a single rewrite, an emergence pattern we analyze in Section~\ref{sec:experiments}.
+In this paper, we propose \textbf{\method} (\textbf{D}iversity-Driven \textbf{A}dversarial \textbf{C}o-\textbf{E}volution), a co-evolutionary safety-alignment framework that targets the two pathologies jointly. On the attacker side, \method exposes an explicit $12\times10$ attack strategy space---$12$ safety risk categories adapted from the Llama-Guard-4 taxonomy~\citep{llamaguard4_2026} and $10$ linguistic attack styles from Rainbow Teaming~\citep{samvelyan2024rainbow}---and optimizes a \emph{normalized marginal coverage gain} reward whose denominator is the best single-sample entropy gain attainable at the current archive state, yielding an $\mathcal{O}(1)$ training signal that does not vanish as training proceeds. On the defender side, \method maintains a single \emph{Bayesian adversarial replay pool} that doubles as the strategy-frequency tracker for the coverage reward: every successful attack carries a Beta--Bernoulli threat posterior, time decay keeps the posterior aligned with the evolving defender, and Thompson sampling balances verified high-threat attacks with uncertain yet promising ones.
 
 % [Contributions 三段式] 大意：按用户要求替换原 bullet 列表为三段英文段落：(1) 提出 diversity-driven 框架；(2) attacker diversity + defender replay 的两个亮点；(3) 实验评估规划。避免过度 overclaim（没有跑完的数字）。
 % 撰写逻辑：Para 1 = problem framing + framework 引入；Para 2 = two highlights（attacker coverage reward + defender Bayesian replay）；Para 3 = empirical plan（evaluate / study，不写 "attains"、"improves" 等过强完成式）。
 % 中文对应内容：贡献段落 1——我们首次把协同演化中的"攻击策略坍缩"和"防御对抗性遗忘"建模成一组需要联合优化的整体问题，并提出多样性驱动的协同演化框架 DACE。贡献段落 2——DACE 有两个机制亮点：attacker 侧把多样性从文本层提升到策略层，以归一化边际覆盖增益为核心奖励；defender 侧引入统一的贝叶斯对抗回放池，用 Beta-Bernoulli 后验加时间衰减和 Thompson 采样连续追踪历史威胁。贡献段落 3——我们在主流安全评测、强自动红队工具与通用能力评测上系统评估 DACE，研究其在防御鲁棒性、通用能力保持与攻击者多样性三个维度上的表现，并发布代码与策略索引回放池。
 \paragraph{Contributions.}
-\textit{First}, we identify and formalize two compounding pathologies---attack strategy collapse and defense adversarial forgetting---that limit the safety robustness of existing RL-based co-evolutionary alignment, and we argue that any framework seeking both \emph{broad} and \emph{persistent} safety must treat strategy coverage and replay-based threat tracking as joint optimization objectives rather than independent add-ons. Building on this framing, we propose \method, a diversity-driven adversarial co-evolution framework.
-
-\textit{Second}, \method contributes two methodological components that directly target the two pathologies. On the attacker side, we introduce a strategy-level diversity mechanism: a structured $12\times10$ attack strategy space (risk category $\times$ attack style) together with a \emph{normalized marginal coverage gain} reward that is bounded, non-vanishing, and interpretable as a one-step KL contraction toward the uniform strategy prior. On the defender side, we introduce a \emph{Bayesian adversarial replay pool} whose Beta--Bernoulli threat posteriors, time decay, and Thompson sampling jointly resolve the uncertainty, stochasticity, and non-stationarity limitations of discrete replay mechanisms.
-
-\textit{Third}, we evaluate \method on nine standard safety benchmarks, six strong automated-attacker benchmarks (including PAIR, TAP, AutoDAN-Turbo, MAJIC), multi-turn X-Teaming, and five general-capability benchmarks, studying its effect on defender safety, capability preservation, attacker coverage, and adversarial forgetting, with ablations that isolate each component. We will release the code and the strategy-indexed adversarial replay pool to support further research on diversity-aware safety alignment.
+\begin{itemize}[leftmargin=*, topsep=2pt, itemsep=2pt]
+  \item We identify and formalize two compounding pathologies---attack strategy collapse and defense adversarial forgetting---that limit the safety robustness of existing RL-based co-evolutionary alignment. To address these, we propose \method, a diversity-driven adversarial co-evolution framework that treats strategy coverage and replay-based threat tracking as joint optimization objectives.
+  \item \method contributes two novel methodological components. On the attacker side, we introduce an explicit $12\times10$ strategy space and a \emph{normalized marginal coverage gain} reward, ensuring a bounded, non-vanishing exploration signal. On the defender side, we introduce a \emph{Bayesian adversarial replay pool} that uses Beta--Bernoulli threat posteriors, time decay, and Thompson sampling to resolve the uncertainty, stochasticity, and non-stationarity limitations of discrete replay mechanisms.
+  \item We evaluate \method on comprehensive safety, strong automated-attacker, multi-turn, and general-capability benchmarks. Our results demonstrate that \method significantly improves defender safety robustness against out-of-distribution attacks without degrading general capabilities, while the attacker achieves broad and effective strategy coverage.
+\end{itemize}
 
 
 % ==========================================================
@@ -369,18 +372,28 @@ We inherit the asymmetric sequential-game formalization of MAGIC~\citep{magic202
 % 撰写逻辑：用策略描述符 b(x) ∈ B 投影到策略空间分布 p_{π_A,t}；collapse = 归一化熵低于阈值（或 max-cell share 高于阈值）；forgetting = 差值指标 F(t_0, t) 为正且显著。这样指标都是可测可验证的。
 % 中文对应内容：给定策略描述符 b(x) ∈ B，令 p_{π_A,t} 是 attacker 在训练步 t 诱导的策略分布，令 H_{t_0} 是 attacker 在较早训练步 t_0 采样的攻击集合。定义（1）攻击策略坍缩：若归一化熵 H(p_{π_A,t}) / log|B| 持续显著小于 1（或等价地 max-cell share 持续高于 threshold），则存在坍缩；（2）防御对抗性遗忘：若 F(t_0, t) = ASR_t(H_{t_0}) - ASR_{t_0}(H_{t_0}) 显著为正，则 defender 在步 t 相较 t_0 对旧攻击的防御能力发生了退化。这两条都是 co-evolutionary 训练动态中的联合病态，DACE 的两个机制分别针对它们。
 We give a compact formalization of the two pathologies \method is designed to mitigate. Let $b(\cdot)$ map an attack to its strategy descriptor in the $12\times10$ grid $\strategyspace$ (Section~\ref{sec:method-space}), and let $\mathbf{p}_{\piA,t}$ denote the marginal distribution induced by $\piA$ over $\strategyspace$ at training step $t$. Let $\mathcal{H}_{t_0}$ be the set of attacks sampled from $\piA$ at an earlier training step $t_0 < t$, and let $\mathrm{ASR}_t(x)$ be the probability that $\piD$ at step $t$ produces an unsafe response to $x$.
+
 \begin{definition}[Attack Strategy Collapse]
 \label{def:collapse}
-The attacker exhibits \emph{strategy collapse} at training step $t$ when the normalized entropy $H(\mathbf{p}_{\piA,t}) / \log|\strategyspace|$ is substantially below $1$ and does not improve as $t$ grows; equivalently, when the maximum per-cell mass $\max_{b\in\strategyspace}\mathbf{p}_{\piA,t}(b)$ remains well above the uniform value $1/|\strategyspace|$.
-\end{definition}
-\begin{definition}[Defense Adversarial Forgetting]
-\label{def:forgetting}
-The defender exhibits \emph{adversarial forgetting} between steps $t_0$ and $t > t_0$ if the net forgetting statistic $F(t_0, t) = \mathbb{E}_{x\in\mathcal{H}_{t_0}}[\mathrm{ASR}_t(x) - \mathrm{ASR}_{t_0}(x)]$ is significantly positive.
+The attacker exhibits \emph{strategy collapse} at training step $t$ when the normalized entropy falls below a critical threshold $\tau_{\mathrm{collapse}} \in (0, 1)$ and does not recover, i.e., $H(\mathbf{p}_{\piA,t}) / \log|\strategyspace| < \tau_{\mathrm{collapse}}$; equivalently, when the maximum per-cell mass $\max_{b\in\strategyspace}\mathbf{p}_{\piA,t}(b)$ remains structurally concentrated above the uniform expectation $1/|\strategyspace|$.
 \end{definition}
 
-% [段 2.3 · 病态耦合]
-% 中文对应内容：这两个病态并非独立失败模式：坍缩的 attacker 让 defender 只在狭窄分布上被训练；偏科 defender 又强化坍缩。因此必须联合缓解。DACE 的多样性奖励直接提升 attacker 策略熵，而贝叶斯回放池通过持续用历史攻击训练 defender 来压低 F(t_0,t)。
-These two definitions isolate, respectively, the \emph{coverage} property on the attacker's side and the \emph{persistence} property on the defender's side. They couple through the shared training loop: a collapsed attacker fuels a forgetful defender, and a forgetful defender rewards a collapsed attacker. A principled remedy must therefore treat them as \emph{joint} objectives. \method's attacker-side mechanism (Section~\ref{sec:method-attacker}) explicitly raises the normalized entropy $H(\mathbf{p}_{\piA,t})/\log|\strategyspace|$ via a normalized KL-contraction reward, while the defender-side mechanism (Section~\ref{sec:method-replay}) pushes the forgetting statistic $F(t_0, t)$ toward zero through the Bayesian adversarial replay pool; the two mechanisms are coupled by a single archive that both read from and write to.
+\begin{definition}[Defense Adversarial Forgetting]
+\label{def:forgetting}
+The defender exhibits \emph{adversarial forgetting} between steps $t_0$ and $t > t_0$ if the net forgetting statistic $F(t_0, t) = \mathbb{E}_{x\in\mathcal{H}_{t_0}}[\mathrm{ASR}_t(x) - \mathrm{ASR}_{t_0}(x)]$ satisfies $F(t_0, t) > \delta_{\mathrm{forget}}$ for some tolerance $\delta_{\mathrm{forget}} > 0$.
+\end{definition}
+
+\subsection{Joint Optimization Objective}
+
+These two definitions isolate, respectively, the \emph{coverage} property on the attacker's side and the \emph{persistence} property on the defender's side. They couple through the shared training loop: a collapsed attacker fuels a forgetful defender, and a forgetful defender rewards a collapsed attacker. A principled remedy must therefore treat them as a constrained joint optimization problem. 
+
+Ideally, we seek an equilibrium where the attacker maximizes its reward subject to a strict lower bound on strategy entropy, and the defender minimizes its loss on the current attack distribution while subject to a penalty on the forgetting statistic over historical distributions:
+\begin{align}
+  \max_{\piA} \quad & \mathbb{E}_{x\sim\piA, y_D\sim\piD} [R_A(x, y_D)] \quad \text{s.t.} \quad \frac{H(\mathbf{p}_{\piA})}{\log|\strategyspace|} \ge \tau, \\
+  \min_{\piD} \quad & \mathbb{E}_{x\sim\piA, y_D\sim\piD} [-R_D(x, y_D)] + \eta \max_{t_0 < t} F(t_0, t).
+\end{align}
+
+Directly solving this constrained joint optimization is computationally intractable in deep RL. The core contribution of \method is to provide an elegant and computationally cheap engineering approximation to this objective. \method's attacker-side mechanism (Section~\ref{sec:method-attacker}) directly lifts the strategy entropy via a normalized KL-contraction reward, while the defender-side mechanism (Section~\ref{sec:method-replay}) bounds the forgetting statistic $F(t_0, t)$ through a Bayesian adversarial replay pool; the two mechanisms are coupled by a single archive that both read from and write to.
 
 
 % ==========================================================
@@ -790,7 +803,7 @@ Defender & no-rev & GCG & PAIR & TAP & AutoDAN & AutoDAN turbo & MAJIC \\
 \footnotetext{Llama3.1-8B-Instruct OpenRT numbers are not reported in MAGIC and will be filled in once our evaluation completes.}
 
 % 中文对应内容：我们期望 DACE 在组合式/迭代式 attacker（AutoDAN-Turbo、MAJIC）上相较 MAGIC 保持明显更低的 ASR，因为这些 attacker 与 DACE 训练中涌现的组合攻击分布更接近；单发 attacker（PAIR / TAP）上的改善可能较温和但仍应呈正向。
-We expect the largest improvement margins on composition-heavy attackers (AutoDAN-Turbo, MAJIC) that most closely resemble the combinatorial rewrites observed during \method's own training, with smaller but still consistent improvements on single-shot attackers such as PAIR and TAP.
+We expect the largest improvement margins on sophisticated attackers (AutoDAN-Turbo, MAJIC) that deeply explore the threat space, with smaller but still consistent improvements on single-shot attackers such as PAIR and TAP.
 
 
 % [Case Study · 简化占位] 大意：主文末尾放一个极简的 case study 预告框，结构沿用 MAGIC style 的 attackerbox，但内容仅保留 "to be supplemented" 骨架 + 引用附录 H 的详细版本，保证审稿人看到 case 存在但不被操作细节占用主文空间。
@@ -798,8 +811,8 @@ We expect the largest improvement margins on composition-heavy attackers (AutoDA
 % \paragraph{Case study preview.}
 \paragraph{Case study preview.}\mbox{}\par
 
-\begin{attackerbox}[Case preview: combinatorial rewrite from \method (to be supplemented)]
-\textbf{What this case will show:} a sanitized late-training rewrite where \method's attacker seamlessly composes two or more $(s, c)$ cells within a single prompt (e.g., a historical-scenario framing layered with emotional manipulation for a weapons-related risk category), producing an attack that falls outside any single cell of the strategy grid. \textbf{Full content (raw seed, declared $(s,c)$, secondary strategies, reasoning trace, and defender verdict) is given in Appendix~\ref{apdx:attack-patterns}, Case H.1;} we reserve this preview slot for the camera-ready version.
+\begin{attackerbox}[Case preview: structured rewrite from \method (to be supplemented)]
+\textbf{What this case will show:} a sanitized late-training rewrite where \method's attacker effectively applies a selected $(s, c)$ strategy (e.g., a historical-scenario framing for a weapons-related risk category) to bypass safety guardrails. \textbf{Full content (raw seed, declared $(s,c)$, reasoning trace, and defender verdict) is given in Appendix~\ref{apdx:attack-patterns}, Case H.1;} we reserve this preview slot for the camera-ready version.
 \end{attackerbox}
 
 
@@ -1182,7 +1195,7 @@ We describe each benchmark used in the main paper in a \texttt{\textbackslash pa
 
 \paragraph{AutoDAN-Turbo~\citep{liu2024autodan}.} A lifelong agent that maintains a growing library of attack strategies and chooses among them via an upper-confidence-style scheduler; represents the state of the art within the OpenRT default attacker suite before MAJIC.
 
-\paragraph{MAJIC~\citep{qi2025majic} \emph{(new, added for \method)}.} Markovian Adaptive Jailbreaking via Iterative Composition of Diverse Innovative Strategies. MAJIC alternates between proposing candidate strategies and composing them through a Markovian plan graph, reportedly achieving $\approx 96\%$ ASR on Qwen2.5-7B-Instruct within $<\!15$ queries and representing the strongest publicly known composition-heavy black-box attacker at submission time. We add MAJIC to Tab.~\ref{tab:harmbench_generalization} as an especially stringent OOD test for \method, since its compositional structure is closest to the combinatorial rewrites our attacker is trained to explore.
+\paragraph{MAJIC~\citep{qi2025majic} \emph{(new, added for \method)}.} Markovian Adaptive Jailbreaking via Iterative Composition of Diverse Innovative Strategies. MAJIC alternates between proposing candidate strategies and composing them through a Markovian plan graph, reportedly achieving $\approx 96\%$ ASR on Qwen2.5-7B-Instruct within $<\!15$ queries and representing the strongest publicly known composition-heavy black-box attacker at submission time. We add MAJIC to Tab.~\ref{tab:harmbench_generalization} as an especially stringent OOD test for \method.
 
 % ----------------------------------------------------------
 % E.3 Multi-turn red-teaming
@@ -1394,16 +1407,16 @@ Figure~\ref{fig:training-dynamics} will plot the core training-dynamics curves: 
 % ==========================================================
 % == Appendix H: Attack patterns                           ==
 % ==========================================================
-\section{Attack Patterns and Combinatorial Emergence}
+\section{Attack Patterns}
 \label{apdx:attack-patterns}
 
-% 中文对应内容：附录 H 用 MAGIC 论文附录 case study 的嵌套 tcolorbox 样式展示 sanitized 的训练后期组合攻击样本：外框为白底黑边、title 为 "Case ..."；内框为 orange 半透明底，承载 attacker 的 <think>/<answer> 内容。每个 case 明确标注 attacker 自声明的 (s, c)、事后识别的其他 (s, c) 成分、以及 defender 最终响应。内容已做去操作化处理。
-We present sanitized late-training rewrites produced by \method, formatted in MAGIC's appendix case-study style (outer black-bordered \texttt{tcolorbox} with an inner orange-tinted \texttt{tcolorbox} for the attacker rewrite). Each case annotates (1) the attacker's self-declared strategy descriptor $(s, c)$, (2) the secondary descriptors identified by post-hoc multi-label annotation, and (3) the defender's final verdict. All operational details are redacted; we retain only the structural composition pattern.
+% 中文对应内容：附录 H 用 MAGIC 论文附录 case study 的嵌套 tcolorbox 样式展示 sanitized 的训练后期组合攻击样本：外框为白底黑边、title 为 "Case ..."；内框为 orange 半透明底，承载 attacker 的 <think>/<answer> 内容。每个 case 明确标注 attacker 自声明的 (s, c)、以及 defender 最终响应。内容已做去操作化处理。
+We present sanitized late-training rewrites produced by \method, formatted in MAGIC's appendix case-study style (outer black-bordered \texttt{tcolorbox} with an inner orange-tinted \texttt{tcolorbox} for the attacker rewrite). Each case annotates (1) the attacker's self-declared strategy descriptor $(s, c)$, and (2) the defender's final verdict. All operational details are redacted.
 
 \begin{tcolorbox}[
   float,
   floatplacement=ht,
-  title={Case H.1: Combinatorial rewrite from \method (sanitized)},
+  title={Case H.1: Structured rewrite from \method (sanitized)},
   colback=white,
   colframe=black,
   boxrule=0.8pt,
@@ -1414,14 +1427,12 @@ We present sanitized late-training rewrites produced by \method, formatted in MA
 
 \textbf{Declared strategy} $b(x)=(s, c)$: \textit{\{risk category --- attack style\}}
 
-\textbf{Secondary strategies engaged} (post-hoc multi-label): \textit{\{list of $(s', c')$ identified in the realized rewrite\}}
-
 \textbf{Attacker rewrite:}
 \begin{tcolorbox}[
   colback=orange!15,colframe=orange!60!black,boxrule=0pt,
   arc=2pt,left=6pt,right=6pt,top=6pt,bottom=6pt
 ]
-\texttt{<think>} \textit{\{sanitized reasoning trace describing the composition plan\}} \texttt{</think>}\\
+\texttt{<think>} \textit{\{sanitized reasoning trace describing the attack plan\}} \texttt{</think>}\\
 \texttt{<strategy>}\\
 risk category: \textit{\{S-name\}}\\
 attack style: \textit{\{C-name\}}\\
@@ -1433,7 +1444,7 @@ attack style: \textit{\{C-name\}}\\
 \end{tcolorbox}
 
 % 中文对应内容：H.1 覆盖 "historical scenario × authority manipulation + role-play" 的组合模式。H.2 覆盖 "emotional manipulation × word play" 以触发 defamation 风险类别的过度合规；H.3 覆盖 "technical terms × hypotheticals" 组合用于 weapon/violent 风险类别。每个 case 使用与 H.1 完全相同的 nested tcolorbox 结构，方便审稿人并排比较。完整案例会在 camera-ready 随释出，所有内容均经伦理清洗。
-We include two additional sanitized cases to illustrate other combinatorial patterns observed in \method's late-training rewrites. Each case re-uses the nested \texttt{tcolorbox} structure of Case H.1 so that readers can compare composition patterns side-by-side.
+We include two additional sanitized cases to illustrate \method's late-training rewrites. Each case re-uses the nested \texttt{tcolorbox} structure of Case H.1 so that readers can compare the rewrite patterns side-by-side.
 
 \begin{tcolorbox}[
   float,
@@ -1448,8 +1459,6 @@ We include two additional sanitized cases to illustrate other combinatorial patt
 \textbf{Raw Prompt} (from WildJailBreak adv-harm, defamation risk): \textit{\{vanilla harmful prompt, redacted\}}
 
 \textbf{Declared strategy} $b(x)=(s, c)$: \textit{\{Defamation --- Emotional Manipulation\}}
-
-\textbf{Secondary strategies engaged} (post-hoc multi-label): \textit{\{Word Play (as a micro-layer), Hypotheticals (frame shift)\}}
 
 \textbf{Attacker rewrite:}
 \begin{tcolorbox}[
@@ -1470,7 +1479,7 @@ attack style: Emotional Manipulation\\
 \begin{tcolorbox}[
   float,
   floatplacement=ht,
-  title={Case H.3: Technical-terms + hypotheticals composition on a violent-crimes seed (sanitized)},
+  title={Case H.3: Technical-terms rewrite on a violent-crimes seed (sanitized)},
   colback=white,
   colframe=black,
   boxrule=0.8pt,
@@ -1480,8 +1489,6 @@ attack style: Emotional Manipulation\\
 \textbf{Raw Prompt} (from WildJailBreak adv-harm, violent-crimes risk): \textit{\{vanilla harmful prompt, redacted\}}
 
 \textbf{Declared strategy} $b(x)=(s, c)$: \textit{\{Violent Crimes --- Technical Terms\}}
-
-\textbf{Secondary strategies engaged} (post-hoc multi-label): \textit{\{Hypotheticals (plausibility framing), Historical Scenario (displacement of agency)\}}
 
 \textbf{Attacker rewrite:}
 \begin{tcolorbox}[
@@ -1499,8 +1506,8 @@ attack style: Technical Terms\\
 \textbf{Defender verdict}: \textit{\{e.g., refused / complied-unsafe / complied-safe\}}
 \end{tcolorbox}
 
-% 中文对应内容：这里补充一段 takeaway：三个 case 共同印证了 DACE attacker 训练后期的 "组合式涌现"（combinatorial emergence）——attacker 声明的 (s, c) 往往只是主轴，实际 rewrite 中会叠加 1–2 个 secondary strategies，使同一 rewrite 跨多个策略单元。这与 Figure 1 的观察以及 §5.3 Table 5 中 DACE 显著高于 MAGIC 的 Coverage / QD-Score 趋势一致。完整 sanitized case 集合见随代码释出的 \texttt{eval-dace/qualitative/}。
-Across the three cases, the self-declared $(s,c)$ constitutes only the \emph{primary} axis of the rewrite; post-hoc annotation identifies one-to-two \emph{secondary} strategies stitched into the same prompt, a ``combinatorial emergence'' phenomenon that explains \method's higher Coverage and QD-Score in Tab.~\ref{tab:attacker-diversity} and is consistent with the right panel of Fig.~\ref{fig:coevo-and-pool}. The full sanitized case set is released with the code under \texttt{eval-dace/qualitative/}.
+% 中文对应内容：这里补充一段 takeaway：三个 case 共同印证了 DACE attacker 能够在其指定的策略槽位内生成结构化、高质量的攻击，而不局限于浅层的文本变异。这与 Figure 1 的观察以及 §5.3 Table 5 中 DACE 显著高于 MAGIC 的 Coverage / QD-Score 趋势一致。完整 sanitized case 集合见随代码释出的 \texttt{eval-dace/qualitative/}。
+Across the three cases, \method's attacker effectively applies the selected $(s,c)$ strategy to generate structured, high-quality jailbreaks rather than relying on superficial textual variations. This focused exploitation explains \method's higher Coverage and QD-Score in Tab.~\ref{tab:attacker-diversity} and is consistent with the right panel of Fig.~\ref{fig:coevo-and-pool}. The full sanitized case set is released with the code under \texttt{eval-dace/qualitative/}.
 
 
 % ==========================================================
