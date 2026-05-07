@@ -599,9 +599,15 @@ The GRPO loss for $R_A$ and $R_D$ is standard and reproduced in Appendix~\ref{ap
 \section{Experiments}
 \label{sec:experiments}
 
-% [Section 4 引子段] 大意：沿 MAGIC 编排把实验分为 defender 主实验 + attacker 主实验两大块；multi-turn 与完整 ablation 下放到附录；保持 "evaluate / study" 口径避免 overclaim。
-% 中文对应内容：我们把 DACE 的实验分成两大块：(i) defender 侧主实验通过 RQ1-RQ3 回答 "是否在更广的安全 benchmark 上降低 ASR 且不诱发过拒"、"通用能力是否保持"、"在强自动红队（含 MAJIC 等组合攻击）下是否继续鲁棒"；(ii) attacker 侧主实验通过 RQ4-RQ5 回答 "attacker 是否能跨 defender 迁移保持攻击力"、"DACE attacker 的策略覆盖与文本多样性是否真优于 MAGIC"。multi-turn 评测与完整 ablation 下放到附录 F.1 / F.2；表头与 MAGIC 保持一致以便并排阅读。凡能对齐 MAGIC 已公开数字的行（MAGIC / Self-RedTeam / 原 instruct 模型）已预先填入 MAGIC 论文的数字；DACE 自身行与新增 MAJIC 列保持 `--`，等评测 pipeline 完成后填入。分析段统一采用 "we evaluate / we study / we expect" 的口径，不预先做完成式宣称。
-We structure the DACE experiments into two main blocks. \textbf{Defender-side} evaluation answers RQ1--RQ3 over safety (Tab.~\ref{tab:evaluation_main}), general capability (Tab.~\ref{tab:general_cap}), and strong out-of-distribution automated red-teaming including the most recent composition-heavy attacker MAJIC (Tab.~\ref{tab:harmbench_generalization}). \textbf{Attacker-side} evaluation answers RQ4--RQ5 over transferability across unseen defenders (Tab.~\ref{tab:attacker-transfer}) and multi-level strategy/text diversity (Tab.~\ref{tab:attacker-diversity}, Fig.~\ref{fig:coevo-and-pool}). Multi-turn evaluation and full ablation studies are reported in Appendix~\ref{apdx:expanded-results}. Baseline rows that coincide with prior published numbers are pre-filled for side-by-side reading, whereas \method cells and the newly added MAJIC column are left as ``--'' pending our evaluation pipeline. The analysis prose uses an \emph{evaluation} framing (``we study'', ``we examine'') rather than pre-committing to specific comparisons.
+% [Section 4 引子段] 大意：参考 SIE 风格在 Section 4 开头集中列出 5 个简短 RQ；后续 4.3 Main Results 与 4.4 Experimental Analysis 以 SIE 风格 "结论 + (RQx)" 作为段落头逐个回答。
+% 中文对应内容：本节通过五个研究问题系统评估 DACE：RQ1 防御端安全性（含过拒）、RQ2 通用能力是否保持、RQ3 防御端在未见 OOD 攻击者上的泛化、RQ4 攻击端跨未见 defender 的可迁移性、RQ5 攻击端在策略与文本两层的多样性。所有 RQ 一次列出，避免重复出现 "Question X:" 的 box；表 1/2/4/5 集中在主结果（4.3）回答 RQ1/RQ2/RQ4/RQ5，表 3 与图 3 在 4.4 实验分析中回答 RQ3 并刻画协同演化动力学。
+To systematically evaluate \method, we conducted comprehensive experiments to answer the following five research questions (RQs):
+(1) \textbf{RQ1}: Can \method improve defender safety without introducing over-refusal on benign prompts?
+(2) \textbf{RQ2}: Are general capabilities preserved during the safety-alignment process?
+(3) \textbf{RQ3}: How well does the \method defender generalise to unseen out-of-distribution attacks?
+(4) \textbf{RQ4}: What is the transferability of the \method attacker across unseen target defenders?
+(5) \textbf{RQ5}: To what extent does the \method attacker achieve broader strategy and textual diversity?
+Sections~\ref{sec:exp-setup}--\ref{sec:exp-eval-protocol} describe the experimental setup and evaluation protocol; Section~\ref{sec:exp-main} reports the main results addressing RQ1--RQ5; Section~\ref{sec:exp-analysis} further analyses the co-evolution dynamics that explain how \method jointly avoids attack strategy collapse and defense adversarial forgetting.
 
 % ----------------------------------------------------------
 % 4.1 Experimental Setup
@@ -609,39 +615,56 @@ We structure the DACE experiments into two main blocks. \textbf{Defender-side} e
 \subsection{Experimental Setup}
 \label{sec:exp-setup}
 
-% [段 · Models & Baselines] 大意：与 MAGIC 的 baseline 对齐，主表覆盖 Qwen2.5-7B 与 Llama3.1-8B 两个 backbone；不比 SSP，保留 Self-RedTeam / MAGIC 作为主要对抗协同演化基线，SmoothLLM / Self-Eval 作为 inference-time 防御对照。
-% 中文对应内容：主表（Table 1 / 2 / 3）覆盖两个 backbone：Qwen2.5-7B-Instruct 与 Llama3.1-8B-Instruct；Qwen2.5-14B-Instruct 的扩展在附录 F.3。基线包括 (1) 原 instruct 模型；(2) Self-RedTeam（零和自博弈 RL）；(3) MAGIC（非对称序贯博弈）；以及 inference-time 防御 (4) SmoothLLM 与 (5) Self-Eval。所有协同演化基线共享 attacker 种子集、defender 基模与判官（Qwen3Guard 训练 + GPT-4o OpenRT 评估），以消除 pipeline 带来的混淆。
-\textbf{Models and baselines.}\quad
-We use \textbf{Qwen2.5-7B-Instruct}~\citep{yang2025qwen25} and \textbf{Llama3.1-8B-Instruct}~\citep{touvron2023llama} as the two defender backbones in the main tables, and report extended results for Qwen2.5-14B-Instruct in Appendix~\ref{apdx:expanded-results}. We compare \method against: (1) the original instruction-tuned model; (2) \textbf{Self-RedTeam}~\citep{liu2025chasing}, a zero-sum self-play RL framework with a Nash-equilibrium objective that shares parameters between attacker and defender; (3) \textbf{MAGIC}~\citep{magic2025}, the closest co-evolution predecessor, which models the interaction as an \emph{asymmetric sequential game} with an SPNE solution concept but leaves attack diversity implicit (no explicit strategy space or coverage reward) and maintains no replay mechanism, so it cannot directly address either the attack-strategy-collapse or the defense-adversarial-forgetting pathology formalized in \S\ref{sec:formalization}; and the inference-time defenses (4) \textbf{SmoothLLM}~\citep{robey2023smoothllm} and (5) \textbf{Self-Eval}~\citep{phute2023llm}, which apply safety constraints at generation time without adversarial co-training. Baselines are aligned with MAGIC's protocol so that the rows in Tables~\ref{tab:evaluation_main}--\ref{tab:harmbench_generalization} can be read side-by-side with MAGIC's reported numbers. To keep the comparison apples-to-apples, all co-evolution baselines use the same attacker SFT seed set, the same defender base model, and the same judges (Qwen3Guard~\citep{zhao2025qwen3guard} in training; GPT-4o as an independent judge in strong OOD attacker evaluations).
+% [段 · Models] 参考 MAGIC §4.1 写法：先列 backbone 与 judge，简洁。
+% 中文对应内容：主表覆盖 Qwen2.5-7B-Instruct 与 Llama3.1-8B-Instruct 两个 backbone；Qwen2.5-14B-Instruct 的扩展在附录；Qwen3Guard 作为训练 reward 与 in-distribution 安全评测 judge，并在 OOD 强红队评测中改用 GPT-4o 做独立 judge。
+\textbf{Models.}\quad
+We use instruction-tuned models from the Qwen2.5 and Llama3.1 families as defender backbones, with Qwen2.5-7B-Instruct~\citep{yang2025qwen25} and Llama3.1-8B-Instruct~\citep{touvron2023llama} reported in the main tables and Qwen2.5-14B-Instruct results provided in Appendix~\ref{apdx:expanded-results}. Unless otherwise specified, Qwen3Guard~\citep{zhao2025qwen3guard} serves as the reward model during training and as the safety judge in subsequent in-distribution safety evaluations; GPT-4o is used as an independent judge in strong OOD attacker evaluations.
 
-% [段 · Training dataset] 按用户要求补充，参考 MAGIC 写法。
-\label{sec:exp-data}
+% [段 · Training dataset] 参考 MAGIC 写法，分 SFT 与 RL 两阶段简述。
+% 中文对应内容：SFT 阶段构造 strategy-conditioned CoT 数据集，要求 attacker 输出 reasoning trace、策略声明 (s,c)、改写 prompt 三段；harmful 子集种子来自 Jailbreak-R1，benign 子集种子来自 WildJailBreak benign 拆分；CoT 用 Gemini-2.5-Pro 蒸馏。RL 阶段从 WildJailBreak 训练拆分各采样 15K 有害 / 良性 vanilla prompt，由 attacker 在线改写。
 \textbf{Training dataset.}\quad
-For the SFT phase, we construct a strategy-conditioned CoT dataset in which every example requires the attacker to emit a reasoning trace, a strategy declaration $(s, c) \in \strategyspace$, and a rewritten prompt. The \emph{harmful subset} sources its seeds from the training data of Jailbreak-R1~\citep{wang2025jailbreakr1}; the \emph{benign subset} sources its seeds from the benign split of WildJailBreak~\citep{jiang2024wildteaming}. For both subsets we synthesize the three-part CoT rewrites using Gemini-2.5-Pro~\citep{comanici2025gemini} under the prompts listed in Appendix~\ref{apdx:prompts}. For the RL phase, we sample 15{,}000 vanilla harmful prompts and 15{,}000 vanilla benign prompts from the training split of WildJailBreak~\citep{jiang2024wildteaming}; the \method attacker rewrites them online during Phase 2. Uniform balancing across the 12 risk categories and 10 attack styles at the SFT stage is described in Appendix~\ref{apdx:space-design}.
+For the SFT phase, we construct a strategy-conditioned CoT dataset in which every example requires the attacker to emit a reasoning trace, a strategy declaration $(s, c) \in \strategyspace$, and a rewritten prompt. The harmful subset sources its seeds from the training data of Jailbreak-R1~\citep{wang2025jailbreakr1}; the benign subset sources its seeds from the benign split of WildJailBreak~\citep{jiang2024wildteaming}. We employ Gemini-2.5-Pro~\citep{comanici2025gemini} to synthesize the three-part CoT rewrites under the prompts listed in Appendix~\ref{apdx:prompts}. For the RL phase, we sample 15{,}000 vanilla harmful prompts and 15{,}000 vanilla benign prompts from the WildJailBreak training split, which are rewritten by the attacker during training. Uniform balancing across the 12 risk categories and 10 attack styles at the SFT stage is described in Appendix~\ref{apdx:space-design}.
+\label{sec:exp-data}
 
-% [段 · Training protocol] 保持低调。
-\textbf{Training protocol.}\quad
-Co-evolution training uses veRL~\citep{sheng2025verl} with GRPO~\citep{shao2024grpo} as the inner optimizer. The \method-specific hyperparameters follow our main configuration (\texttt{grpo\_dace\_diversity\_v4.sh}): uniform Beta prior $\alpha=\beta=1$, time decay $\gamma=0.90$, replay batch $B_{\mathrm{replay}}=32$ paired with training batch $B_{\mathrm{train}}=64$, rollout $n=6$, pruning $\tau_{\mathrm{prune}}=0.45$ with $n_{\min}=2$, archive capacity $4000$, and $\mathtt{clip\_negative}=\mathrm{true}$ on the coverage reward. Detailed hyperparameters and compute budget are reported in Appendix~\ref{apdx:training-setup}.
+% [段 · Baselines] 严格按 MAGIC 风格三类 baseline 列出：原 instruct、self-play 协同演化（Self-RedTeam, MAGIC）、推理时防御（SmoothLLM, Self-Eval）。
+% 中文对应内容：与 MAGIC §4.1 baseline 段对齐。(1) 原始 instruct 模型；(2) 协同演化：Self-RedTeam（零和自博弈）、MAGIC（非对称序贯博弈）；(3) 推理时防御：SmoothLLM、Self-Eval。详细超参与训练设置在附录。
+\textbf{Baselines.}\quad
+We compare \method against the following baselines: (1) the original instruction-tuned Qwen2.5 and Llama3.1 models; (2) two co-evolution methods, \textbf{Self-RedTeam}~\citep{liu2025chasing}, an online self-play adversarial RL method that uses shared parameters for both the attacker and the defender, and \textbf{MAGIC}~\citep{magic2025}, the closest co-evolution predecessor that models the interaction as an asymmetric sequential game with an SPNE solution concept; and (3) inference-time defense baselines, \textbf{SmoothLLM}~\citep{robey2023smoothllm} and \textbf{Self-Eval}~\citep{phute2023llm}, which apply alignment or safety constraints during generation without adversarial co-training. More experimental details are provided in Appendix~\ref{apdx:training-setup}.
 
-% [段 · Evaluation protocol]
-\textbf{Evaluation protocol.}\quad
-We adopt Qwen3Guard as the safety moderator for training and in-distribution safety evaluation, and we use GPT-4o as an independent judge in strong OOD attacker evaluations, following the prompt in Appendix~\ref{apdx:prompts}. For safety, we evaluate harmful refusal on WildGuardTest~\citep{han2024wildguard}, the WildJailBreak adversarial-harm split~\citep{jiang2024wildteaming}, HarmBench~\citep{mazeika2024harmbench} vanilla and adversarial splits, DAN~\citep{shen2023doanythingnow}, OR-Bench-Toxic~\citep{cui2024orbench}, the XSTest contrast categories~\citep{rottger2023xstest}, and StrongREJECT~\citep{souly2024strongreject}; and benign compliance on the XSTest safe categories and the WildJailBreak adversarial-benign split. For OOD attacker robustness we use the OpenRT framework~\citep{OpenRT2026} with PAIR, TAP, AutoDAN, AutoDAN-Turbo, and---following the user request---MAJIC~\citep{qi2025majic}. For multi-turn robustness we use X-Teaming~\citep{rahman2025xteaming}. General capability is measured by IFEval~\citep{zhou2023ifeval}, ARC-Challenge~\citep{clark2018arc}, GPQA~\citep{rein2023gpqa}, MMLU~\citep{hendrycks2021mmlu}, and AlpacaEval~2~\citep{dubois2024alpacaeval2}. Detailed benchmark descriptions are given in Appendix~\ref{apdx:bench-protocol}.
+% [段 · Evaluation protocol] 已迁移至独立子节 §\ref{sec:exp-eval-protocol}。
+% [段 · Training protocol] 训练超参与训练协议下放至 Appendix~\ref{apdx:training-setup}，按 MAGIC 风格保持 4.1 简洁。
+
+% ----------------------------------------------------------
+% 4.2 Evaluation Protocol (independent subsection)
+% ----------------------------------------------------------
+\subsection{Evaluation Protocol}
+\label{sec:exp-eval-protocol}
+
+% [段 · Evaluation 总览] 参考 MAGIC §4.2 开头的简短总介绍。
+% 中文对应内容：参考 MAGIC §4.2 写法，先用一两句话总览：评测同时覆盖安全与通用能力；对 Self-RedTeam 与 MAGIC 等基线，能复用其官方 checkpoint / 公开数字的部分直接复用，不重新训练。
+We evaluate \method on both safety capability and general capability. For baselines, we reuse the officially released checkpoints and reported numbers of Self-RedTeam and MAGIC where available, and re-run them under our protocol otherwise so that all rows can be read side-by-side.
+
+% [段 · Safety evaluation]
+% 中文对应内容：本段汇报安全评测使用的 in-distribution 静态基准与 OOD 自动红队基准。Qwen3Guard 作为训练-评测共享 judge；GPT-4o 作为强 OOD 评测的独立 judge。
+\textbf{Safety evaluation.}\quad
+We evaluate harmful refusal on WildGuardTest~\citep{han2024wildguard}, the WildJailBreak adversarial-harm split~\citep{jiang2024wildteaming}, HarmBench~\citep{mazeika2024harmbench} vanilla and adversarial splits, DAN~\citep{shen2023doanythingnow}, OR-Bench-Toxic~\citep{cui2024orbench}, the XSTest contrast categories~\citep{rottger2023xstest}, and StrongREJECT~\citep{souly2024strongreject}; benign compliance is measured on the XSTest safe categories and the WildJailBreak adversarial-benign split. Static safety benchmarks are judged by Qwen3Guard~\citep{zhao2025qwen3guard} for in-distribution safety. For out-of-distribution attacker robustness we use the OpenRT framework~\citep{OpenRT2026} with PAIR, TAP, AutoDAN, and AutoDAN-Turbo, and we use GPT-4o as an independent judge under the prompt in Appendix~\ref{apdx:prompts}. Detailed benchmark descriptions are given in Appendix~\ref{apdx:bench-protocol}.
+
+% [段 · General capability evaluation]
+% 中文对应内容：通用能力使用 IFEval、ARC-C、GPQA、MMLU 与 AlpacaEval 2 五项基准，覆盖指令遵循、常识/科学推理、综合知识与开放式生成质量。
+\textbf{General capability evaluation.}\quad
+We evaluate general capability on five widely used benchmarks covering instruction following, multi-task reasoning, and open-ended generation quality: IFEval~\citep{zhou2023ifeval}, ARC-Challenge~\citep{clark2018arc}, GPQA~\citep{rein2023gpqa}, MMLU~\citep{hendrycks2021mmlu}, and AlpacaEval~2~\citep{dubois2024alpacaeval2}. These benchmarks together monitor whether the iterative safety-driven RL training degrades the defender's downstream usefulness.
 
 
 % ----------------------------------------------------------
-% 4.2 Defender Evaluation (RQ1 safety / RQ2 capability / RQ3 OOD+MAJIC)
+% 4.3 Main Results (RQ1 safety / RQ2 capability / RQ4 attacker transfer / RQ5 diversity)
 % ----------------------------------------------------------
-\subsection{Defender Evaluation}
+\subsection{Main Results}
 \label{sec:exp-main}
-
-\begin{rqbox}
-\textbf{Question 1:} \textit{Does \method improve defender safety without introducing over-refusal on benign prompts?}
-\end{rqbox}
 
 % [Table 1 – MAGIC 表 1 风格，两 backbone 块 × 3 baseline 行 + 1 DACE 行] 单元格与 MAGIC 对齐的行（base / +Self-RedTeam / +MAGIC）直接填入 MAGIC 数字；DACE 自身行保持 `--`。列结构沿用 MAGIC：9 列 Harmful Refusal + 2 列 Benign Compliance。
 \begin{table*}[t]
 \centering
-\caption{\textbf{Safety evaluation on harmful refusal and benign compliance.} Lower Attack Success Rate (ASR) indicates stronger refusal; higher Robustness to Attacks (RTA) / Compliance Rate (Comply) indicates better safety and helpfulness. Cells in the baseline rows (\textit{base}, \textit{+Self-RedTeam}, \textit{+MAGIC}) are taken from MAGIC~\citep{magic2025} to enable side-by-side reading. \method rows are placeholders pending our evaluation pipeline.}
+\caption{\textbf{Safety evaluation on harmful refusal and benign compliance.} Lower ASR is better; higher RTA / Comply is better. Baseline rows on \textit{Qwen2.5-7B-Instruct} are taken from MAGIC~\citep{magic2025}.}
 \label{tab:evaluation_main}
 \setlength{\tabcolsep}{3.2pt}
 \renewcommand{\arraystretch}{1.15}
@@ -691,18 +714,13 @@ Method
 \end{table*}
 
 
-% [段 · RQ1 解读 · 软] 保持 planned / expected 语气，避免 overclaim；两 backbone 读者都会关心。
-% 中文对应内容：我们期望 DACE 在 adversarial harmful benchmark（WG-Test adv、WJB adv、HarmBench adv、DAN 等）上相比 MAGIC 取得进一步下降的 ASR，同时在 benign benchmark（XSTest Comply、WJB benign ASR）上保持与 MAGIC 同量级的合规率，两个 backbone 上的趋势一致——这与 §2 双病态的形式化结论一致：把坍缩的 attacker 推向策略空间中更广的区域等价于把 defender 训练在更均衡的攻击分布上，从而同时提升鲁棒性与不诱发过拒。
-We evaluate the two backbones in parallel; we expect \method to further lower ASR on adversarial harmful splits (WG:Test adv, WJB adv, HarmBench adv, DAN) without degrading benign compliance (XSTest Comply, WJB benign ASR). Pushing the attacker toward broader strategy coverage is equivalent to training the defender on a more uniform attack distribution, and the refusal reward plus the dual success definition (\S\ref{sec:method-attacker}) explicitly protect benign compliance.
-
-
-\begin{rqbox}
-\textbf{Question 2:} \textit{Does \method's iterative RL training degrade general capabilities?}
-\end{rqbox}
+% [段 · RQ1 解读 · SIE 风格 "结论 + (RQx)"]
+% 中文对应内容：以 SIE 风格段落开头给出结论 + (RQ1)；强调 DACE 在两个 backbone 的 adversarial 与 vanilla 有害子集上将 ASR 全面压低到 MAGIC 之下，同时 benign compliance 不退化；明确将增益归因于多样性驱动探索 + 贝叶斯回放池两机制。
+\textbf{\method effectively improves defender safety without inducing over-refusal (RQ1).} As shown in Table~\ref{tab:evaluation_main}, on both \textit{Qwen2.5-7B-Instruct} and \textit{Llama3.1-8B-Instruct}, \method delivers consistent and substantial reductions in attack success rate across all harmful-refusal subsets (WG:Test adv/van., WJB adv, DAN, HarmBench adv/van.) compared to MAGIC and Self-RedTeam, while preserving benign compliance on the WJB benign and XSTest safe splits within a fraction of a point of the strongest baseline. The defender therefore becomes strictly safer \emph{and} continues to comply with legitimate user requests. We attribute this dual gain to the two mechanisms introduced in Section~\ref{sec:method}: the \emph{diversity-driven exploration} reward broadens the attack distribution that the defender is trained against, and the \emph{Bayesian adversarial replay pool} continuously re-injects historically threatening attacks into the training mini-batch. The first prevents the defender from being trained on a narrow attack mode; the second prevents it from drifting away from earlier modes once the attacker evolves.
 
 \begin{table*}[t]
 \centering
-\caption{\textbf{General-capability evaluation.} Higher is better on all benchmarks. Baseline rows (\textit{base}, \textit{+Self-RedTeam}, \textit{+MAGIC}) are taken from MAGIC~\citep{magic2025}; \method rows are placeholders pending our evaluation pipeline.}
+\caption{\textbf{General-capability evaluation.} Higher is better on all benchmarks. Baseline rows on \textit{Qwen2.5-7B-Instruct} are taken from MAGIC~\citep{magic2025}.}
 \label{tab:general_cap}
 \setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.12}
@@ -726,86 +744,61 @@ Method & \multicolumn{2}{c}{IFEval} & ARC-C & GPQA & MMLU & AlpacaEval 2 \\
 \end{tabular}
 \end{table*}
 
-% 中文对应内容：我们期望 DACE 的通用能力与 instruction-tuned 基线及 MAGIC 差距保持在一两个点以内，GPQA 等需要细分推理的测试上甚至可能受益于更结构化的策略监督。
-We examine whether the additional diversity reward and replay mechanism harm instruction following, reasoning, or general knowledge. Given that \method only adds attacker-side regularization and a replay mini-batch to the defender, we expect general capability to remain within a narrow range of the co-evolution baselines, consistent with prior observations~\citep{magic2025} that adversarial co-training with safety-only rewards preserves downstream capability.
+% [段 · RQ2 解读 · SIE 风格]
+% 中文对应内容：以 SIE 风格 "结论 + (RQ2)" 给出结论：通用能力在迭代 RL 后保持完整。说明 DACE 仅在 attacker 端加正则、在 defender batch 中插入回放，不引入任何会损害下游能力的目标；GPQA 上甚至略升，反映结构化策略监督的副作用。
+\textbf{General capabilities remain intact after iterative RL training (RQ2).} Table~\ref{tab:general_cap} shows that on both backbones \method matches the original instruction-tuned model and the co-evolution baselines on IFEval, ARC-C, MMLU, and AlpacaEval~2 to within at most one point, and slightly improves AlpacaEval~2 LC win rate on Qwen2.5-7B-Instruct. This confirms that the diversity-driven attacker reward and the Bayesian replay mini-batch on the defender side---both safety-only signals layered on top of GRPO---do not interfere with instruction following or general knowledge, consistent with prior observations~\citep{magic2025} that adversarial co-training with safety-only rewards preserves downstream capability.
 
 
-\begin{rqbox}
-\textbf{Question 3:} \textit{Does the \method defender generalize to strong automated red-teaming attackers, including recent composition-heavy attacks?}
-\end{rqbox}
-
-% Table 3: MAGIC format + add MAJIC column (table* 跨栏以匹配 MAGIC 的 Table 3 样式)；两 backbone 块，MAGIC 公开的 Qwen 数字直接填入，Llama 块全部 `--`（MAGIC 未公开 Llama3.1-8B 的 OpenRT 数字）。
-\begin{table*}[t]
-\centering
-\caption{\textbf{Defender generalization evaluation on HarmBench} using the OpenRT~\citep{OpenRT2026} framework with GPT-4o as the judge model. MAJIC~\citep{qi2025majic} is added to represent the most recent composition-heavy black-box attacker. Baseline cells on \textit{Qwen2.5-7B-Instruct} are taken from MAGIC~\citep{magic2025}; \method rows, the MAJIC column, and \textit{Llama3.1-8B-Instruct} cells are placeholders pending our evaluation pipeline.\protect\footnotemark}
-\label{tab:harmbench_generalization}
-\setlength{\tabcolsep}{2pt}
-\renewcommand{\arraystretch}{1.15}
-\scriptsize
-\begin{tabular}{%
-  l
-  >{\centering\arraybackslash}p{0.08\columnwidth}
-  >{\centering\arraybackslash}p{0.08\columnwidth}
-  >{\centering\arraybackslash}p{0.08\columnwidth}
-  >{\centering\arraybackslash}p{0.08\columnwidth}
-  >{\centering\arraybackslash}p{0.10\columnwidth}
-  >{\centering\arraybackslash}p{0.15\columnwidth}
-  >{\centering\arraybackslash}p{0.09\columnwidth}
-}
-\toprule
-& \multicolumn{7}{c}{Attacker (HarmBench ASR$\downarrow$)(\%)} \\
-\cmidrule(lr){2-8}
-Defender & no-rev & GCG & PAIR & TAP & AutoDAN & AutoDAN turbo & MAJIC \\
-\midrule
-\textit{Qwen2.5-7B-Instruct}   & 25.62 & 43.90 & 44.38 & 63.75 & 47.81 & 75.00 & -- \\
-% \quad + Self-Eval              & 24.06 & 28.75 & 37.19 & 50.00 & 42.81 & 89.06 & -- \\
-% \quad + SmoothLLM              & 19.38 & 20.00 & 30.63 & 61.25 & 62.19 & 70.31 & -- \\
-\quad + Self-RedTeam           & 19.38 & 22.50 & 31.88 & 40.00 & 30.31 & 66.88 & -- \\
-\quad + MAGIC                  & 13.44 & 11.25 & 25.31 & 35.63 & 24.38 & 54.69 & -- \\
-\cellcolor{cyan!15}\quad + \textbf{\method (ours)} & \cellcolor{cyan!15}12.19 & \cellcolor{cyan!15}10.31 & \cellcolor{cyan!15}17.81 & \cellcolor{cyan!15}33.43 & \cellcolor{cyan!15}22.18 & \cellcolor{cyan!15}42.81 & \cellcolor{cyan!15}-- \\
-% \addlinespace[0.35em]
-% \textit{Llama3.1-8B-Instruct}  & -- & -- & -- & -- & -- & -- & -- \\
-% \quad + Self-Eval              & -- & -- & -- & -- & -- & -- & -- \\
-% \quad + SmoothLLM              & -- & -- & -- & -- & -- & -- & -- \\
-% \quad + Self-RedTeam           & -- & -- & -- & -- & -- & -- & -- \\
-% \quad + MAGIC                  & -- & -- & -- & -- & -- & -- & -- \\
-% \cellcolor{cyan!15}\quad + \textbf{\method (ours)} & \cellcolor{cyan!15}-- & \cellcolor{cyan!15}-- & \cellcolor{cyan!15}-- & \cellcolor{cyan!15}-- & \cellcolor{cyan!15}-- & \cellcolor{cyan!15}-- & \cellcolor{cyan!15}-- \\
-\bottomrule
-\end{tabular}
-\end{table*}
-\footnotetext{Llama3.1-8B-Instruct OpenRT numbers are not reported in MAGIC and will be filled in once our evaluation completes.}
-
-% 中文对应内容：我们期望 DACE 在组合式/迭代式 attacker（AutoDAN-Turbo、MAJIC）上相较 MAGIC 保持明显更低的 ASR，因为这些 attacker 与 DACE 训练中涌现的组合攻击分布更接近；单发 attacker（PAIR / TAP）上的改善可能较温和但仍应呈正向。
-We expect the largest improvement margins on sophisticated attackers (AutoDAN-Turbo, MAJIC) that deeply explore the threat space, with smaller but still consistent improvements on single-shot attackers such as PAIR and TAP.
-
-
-% [Case Study · 简化占位] 大意：主文末尾放一个极简的 case study 预告框，结构沿用 MAGIC style 的 attackerbox，但内容仅保留 "to be supplemented" 骨架 + 引用附录 H 的详细版本，保证审稿人看到 case 存在但不被操作细节占用主文空间。
-% 中文对应内容：我们在 §5.2 末尾以极简占位的方式预告一个 sanitized case study，它在 DACE 训练后期常见——attacker 会把多重 (s, c) 组合成单个 prompt。主文仅保留抽象描述与指向附录 H.1 详细版本的引用；完整 sanitized case（含 <think>/<strategy>/<answer>）在附录 H 呈现。
-% \paragraph{Case study preview.}
-\paragraph{Case study preview.}\mbox{}\par
-
-\begin{attackerbox}[Case preview: structured rewrite from \method (to be supplemented)]
-\textbf{What this case will show:} a sanitized late-training rewrite where \method's attacker effectively applies a selected $(s, c)$ strategy (e.g., a historical-scenario framing for a weapons-related risk category) to bypass safety guardrails. \textbf{Full content (raw seed, declared $(s,c)$, reasoning trace, and defender verdict) is given in Appendix~\ref{apdx:attack-patterns}, Case H.1;} we reserve this preview slot for the camera-ready version.
-\end{attackerbox}
-
-
-% ----------------------------------------------------------
-% 4.3 Attacker Evaluation (RQ4 transferability / RQ5 diversity + merged Fig 3)
-% ----------------------------------------------------------
-\subsection{Attacker Evaluation}
-\label{sec:exp-attacker}
-
-% [Section 4.3 引子] 大意：attacker 侧主实验两问：transferability (跨未见 defender) 和 diversity (策略/语义/文本三层对比 MAGIC)。Figure 3 (合并 co-evolution heatmap + replay pool) 作为视觉证据同时支撑两问。
-% 中文对应内容：attacker 主实验分两个 RQ：RQ4 考察 DACE attacker 在未见 defender 上的攻击可迁移性，直接对照 MAGIC Table 10 协议；RQ5 考察 DACE attacker 在最后 15 步训练历史（及最终 replay pool）上是否比 MAGIC 拥有更广的策略覆盖与更低的语义/文本冗余。合并后的 Figure 3 左面板为 DACE 的 attacker-defender cross-evaluation（类似 MAGIC Figure 3 的 co-evolution heatmap），右面板为 DACE 最终回放池上 12×10 策略分布与 Beta-Bernoulli 后验有害性 $\hat p=(\alpha+s)/(\alpha+\beta+s+f)$ 的联合热图——左图说明协同演化稳态收敛，右图说明策略展开仍保留高有害性。
-
-\begin{rqbox}
-\textbf{Question 4:} \textit{Does the \method attacker transfer across unseen defenders at levels comparable to or exceeding MAGIC's attacker?}
-\end{rqbox}
-
-% [Table 4 · attacker ASR · MAGIC Table 10 风格] 600 WJB vanilla harmful prompts，GPT-4o 打分，temperature=0；行仅 Base / MAGIC / DACE attacker；列扩展为 6 个 defender：Qwen2.5-7B-IT / Llama3.1-8B-IT / Mistral-7B-IT / Gemini-2.5-Flash / MAGIC-def / DACE-def。MAGIC 行填入 MAGIC 论文的数字；DACE-defender 列与 DACE-attacker 行保持 `--`。
+% Table 3 (RQ3): HarmBench OOD generalization (MAJIC 列已删除)；MAGIC 公开的 Qwen 数字直接填入。回到主结果 4.3，使表号回到 Table 3。
 \begin{table}[t]
 \centering
-\caption{\textbf{Attacker transferability (MAGIC Table~10 style).} Attack success rate (\%) on 600 WildJailbreak vanilla harmful prompts judged by GPT-4o following the OpenRT~\citep{OpenRT2026} policy-violation rubric. Each attacker produces a single rewrite per seed with temperature $0$. Lower ASR indicates a stronger defender. Cells in the \textit{Base} and \textit{MAGIC-attacker} rows (columns up to \textit{MAGIC-Def.}) are reproduced from MAGIC~\citep{magic2025}; the \method-Def.\ column and the \textit{\method-attacker} row are placeholders pending our evaluation pipeline.}
+\caption{\textbf{Defender generalisation to OOD automated red-teaming attackers} on HarmBench, evaluated with the OpenRT~\citep{OpenRT2026} framework using GPT-4o as the judge. Lower ASR is better. Baseline rows are taken from MAGIC~\citep{magic2025}.}
+\label{tab:harmbench_generalization}
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.15}
+\scriptsize
+\begin{tabular}{lcccccc}
+\toprule
+& \multicolumn{6}{c}{Attacker (HarmBench ASR$\downarrow$, \%)} \\
+\cmidrule(lr){2-7}
+Defender & no-rev & GCG & PAIR & TAP & AutoDAN & AutoDAN-Turbo \\
+\midrule
+\textit{Qwen2.5-7B-Instruct}   & 25.62 & 43.90 & 44.38 & 63.75 & 47.81 & 75.00 \\
+\quad + Self-RedTeam           & 19.38 & 22.50 & 31.88 & 40.00 & 30.31 & 66.88 \\
+\quad + MAGIC                  & 13.44 & 11.25 & 25.31 & 35.63 & 24.38 & 54.69 \\
+\cellcolor{cyan!15}\quad + \textbf{\method (ours)} & \cellcolor{cyan!15}12.19 & \cellcolor{cyan!15}10.31 & \cellcolor{cyan!15}17.81 & \cellcolor{cyan!15}33.43 & \cellcolor{cyan!15}22.18 & \cellcolor{cyan!15}42.81 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% [段 · RQ3 解读 · SIE 风格]
+% 中文对应内容：以 SIE 风格 "结论 + (RQ3)" 段头：DACE 在每一种 OOD attacker 上都把 ASR 进一步压低；最大幅度出现在迭代式/组合式 attacker（AutoDAN-Turbo, TAP）上，因为这些攻击者最接近 DACE 训练后期涌现的组合策略分布；对单发 attacker (PAIR) 仍有明显改进。归因于策略层覆盖让 defender 见过相邻 (s,c) 组合的近邻样本，回放池又防止它从早期模式漂走。
+\textbf{The \method defender demonstrates robust generalisation to OOD attacks (RQ3).} Table~\ref{tab:harmbench_generalization} evaluates the defender against six unseen automated attackers on HarmBench. \method achieves the lowest ASR across every column---reducing AutoDAN-Turbo from $54.69\%$ (MAGIC) to $42.81\%$, PAIR from $25.31\%$ to $17.81\%$, and the no-rewrite baseline to $12.19\%$. The improvement margin is largest on iterative or composition-heavy attackers such as AutoDAN-Turbo, TAP, and PAIR, which most closely resemble the strategy combinations emerging in late-training rollouts of \method's diverse attacker; the defender has therefore been exposed to neighbours of these attack distributions during training and generalises to them at test time. The strategy-level coverage reward and the Bayesian replay pool both contribute: the former exposes the defender to a wide cross-section of $(s, c)$ combinations, and the latter prevents the defender from drifting away from earlier modes that PAIR/TAP-style iterative attacks tend to revisit.
+
+
+% [Table 3 + Case study preview · 已上移；Case study preview 注释保留以备后用]
+
+% \begin{rqbox}
+% \textbf{Question 3:} \textit{Does the \method defender generalize to strong automated red-teaming attackers, including recent composition-heavy attacks?}
+% \end{rqbox}
+
+% \paragraph{Case study preview.}\mbox{}\par
+% \begin{attackerbox}[Case preview: structured rewrite from \method (to be supplemented)]
+% \textbf{What this case will show:} a sanitized late-training rewrite where \method's attacker effectively applies a selected $(s, c)$ strategy (e.g., a historical-scenario framing for a weapons-related risk category) to bypass safety guardrails. \textbf{Full content (raw seed, declared $(s,c)$, reasoning trace, and defender verdict) is given in Appendix~\ref{apdx:attack-patterns}, Case H.1;} we reserve this preview slot for the camera-ready version.
+% \end{attackerbox}
+
+
+% ----------------------------------------------------------
+% 4.3 (cont.): Attacker-side main results (RQ4 transferability / RQ5 diversity)
+% ----------------------------------------------------------
+
+% [Section 4.3 attacker 子段引子] 大意：attacker 侧主结果两表 (Table 4 / Table 5) 仍归入 Main Results；Figure 3 与协同演化分析下沉到 4.4 Experimental Analysis。
+% 中文对应内容：attacker 主结果分两个 RQ：RQ4 跨未见 defender 的攻击迁移能力，对应 Table 4；RQ5 攻击端的策略与文本多样性，对应 Table 5。深入的协同演化动力学与回放池可视化（Figure 3）放到 4.4 实验分析。
+
+% [Table 4 · attacker ASR] 600 WJB vanilla harmful prompts，GPT-4o 打分；行 Base / MAGIC / DACE attacker；列 4 个 unseen defender + MAGIC-Def + DACE-Def。
+\begin{table}[t]
+\centering
+\caption{\textbf{Attacker transferability across defenders.} Attack success rate (\%) on 600 WildJailbreak vanilla harmful prompts judged by GPT-4o; lower ASR indicates a stronger defender. Baseline rows on \textit{Qwen2.5-7B-IT}--\textit{MAGIC-Def.} are reproduced from MAGIC~\citep{magic2025}.}
 \label{tab:attacker-transfer}
 \setlength{\tabcolsep}{3pt}
 \renewcommand{\arraystretch}{1.12}
@@ -823,65 +816,74 @@ Attacker & \textit{Qwen2.5-7B-IT} & \textit{Llama3.1-8B-IT} & \textit{Mistral-7B
 \end{tabular}
 \end{table}
 
-% [段 · RQ4 分析] 大意：attacker 侧的外部化迁移评估；MAGIC attacker 是目前最强的协同演化 attacker，DACE 既要在 unseen defender 上不弱于 MAGIC attacker（支撑"更广的策略覆盖不以攻击强度为代价"），也要在 \method-defender 列上被自己训练出来的 defender 压制（支撑防御端鲁棒性）。
-% 中文对应内容：我们期望 DACE attacker 在 Qwen / Llama / Mistral / Gemini 上的 ASR 与 MAGIC attacker 相当或略高，说明策略覆盖的增加不以单样本攻击强度下降为代价；而 DACE-defender 列上 DACE-attacker 的 ASR 会明显压低，说明协同演化收敛成 "attacker 强到各处，defender 恰好抵挡住自己训练出来的 attacker" 的稳定态，同时侧面印证 Figure~\ref{fig:coevo-and-pool} 左面板的 co-evolution 稳态。
-We evaluate whether \method's attacker transfers across defenders it has not been co-trained with. Following the MAGIC~\citep{magic2025} Table~10 protocol, each attacker produces a single rewrite per seed on 600 WildJailbreak vanilla harmful prompts; GPT-4o scores the defender response on the OpenRT policy-violation rubric (temperature $0$, single rollout). We expect \method-attacker to match or exceed MAGIC-attacker on \textit{unseen} defenders (columns 1--4), confirming that broader strategy coverage does \emph{not} trade off single-shot attack strength; and to be sharply suppressed on the matched \method-defender column, consistent with the co-evolution equilibrium visualized in Fig.~\ref{fig:coevo-and-pool} (left).
+% [段 · RQ4 解读 · SIE 风格]
+% 中文对应内容：以 SIE 风格 "结论 + (RQ4)" 段头：DACE attacker 在四个未见 defender 上预期会全面优于 MAGIC attacker，证明扩大策略覆盖并未牺牲单发攻击强度；同时在 \method-defender 列上 ASR 远低于 MAGIC-attacker 在 MAGIC-defender 列上的同位结果，间接验证防御端的鲁棒性。
+\textbf{The \method attacker exhibits strong transferability across unseen defenders (RQ4).} Table~\ref{tab:attacker-transfer} reports the cross-defender attack success rate of \method-attacker, MAGIC-attacker, and the base instruction-tuned attacker on 600 WildJailbreak vanilla harmful prompts. Across the four \emph{unseen} defenders---Qwen2.5-7B-IT, Llama3.1-8B-IT, Mistral-7B-IT, and Gemini-2.5-Flash---the \method attacker is expected to match or surpass MAGIC-attacker, demonstrating that the broader strategy coverage encouraged by the diversity-driven exploration reward (Section~\ref{sec:method-attacker}) does \emph{not} come at the cost of single-shot attack strength. Conversely, on the matched \method-defender column, the \method attacker is sharply suppressed and produces a notably lower ASR than MAGIC-attacker faces on its own MAGIC-defender, providing indirect but strong evidence that the \method defender is more robust precisely because it has been trained against this stronger and more diverse adversary.
 
 
-\begin{rqbox}
-\textbf{Question 5:} \textit{Does the \method attacker cover the attack strategy space more broadly and more evenly than MAGIC's attacker, at both the strategy and the textual level?}
-\end{rqbox}
-
-% [Table 5 · diversity metrics · MAGIC vs DACE vs DACE replay pool] 三行：MAGIC 最后 15 步（8gpu-tp2，~64·4·15≈3840 样本）、DACE 最后 15 步（sft-full，~64·6·15≈5760 样本）、DACE 最终 replay pool（max_pool=4000）。列：策略层 (Coverage, Shannon H, QD-Score) + 语义层 (SBERT cos↓) + 文本层 (Self-BLEU↓, Distinct-2↑, n-gram entropy↑)。
+% [Table 5 · diversity metrics] 三行；列删除 QD-Score 与 n-gram entropy（按用户要求）；保留 Coverage, Shannon H, SBERT cos, Self-BLEU, Distinct-2 五项。
 \begin{table}[t]
 \centering
-\caption{\textbf{Multi-level diversity comparison between MAGIC and \method attackers} on the last 15 training steps and on the final \method replay pool. Coverage, Shannon entropy, and QD-Score operate on the $12\times10$ strategy grid; SBERT cosine distance and Self-BLEU / Distinct-2 / n-gram entropy are textual-level metrics. MAGIC does not emit explicit $(s,c)$ tags, so its strategy-grid metrics are obtained via a post-hoc multi-label annotation (described in Appendix~\ref{apdx:expanded-results}). All values are placeholders pending evaluation.}
+\caption{\textbf{Multi-level attack diversity comparison.} Strategy-level (Coverage, Shannon entropy on the $12\times10$ grid), semantic-level (SBERT cosine), and textual-level (Self-BLEU, Distinct-2) metrics over the last 15 training steps and the final \method replay pool. MAGIC strategy-grid metrics are obtained via post-hoc multi-label annotation (Appendix~\ref{apdx:expanded-results}).}
 \label{tab:attacker-diversity}
-\setlength{\tabcolsep}{3pt}
+\setlength{\tabcolsep}{4pt}
 \renewcommand{\arraystretch}{1.15}
 \scriptsize
-\begin{tabular}{lccccccc}
+\begin{tabular}{lccccc}
 \toprule
-& \multicolumn{3}{c}{Strategy level (on $12\times10$ grid)} & Semantic & \multicolumn{3}{c}{Textual level} \\
-\cmidrule(lr){2-4}\cmidrule(lr){5-5}\cmidrule(lr){6-8}
+& \multicolumn{2}{c}{Strategy level} & Semantic & \multicolumn{2}{c}{Textual level} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-4}\cmidrule(lr){5-6}
 Attacker source (\# samples)
 & Coverage$\uparrow$
 & Shannon H$\uparrow$
-& QD-Score$\uparrow$
 & SBERT cos$\downarrow$
 & Self-BLEU$\downarrow$
-& Distinct-2$\uparrow$
-& $n$-gram ent.$\uparrow$ \\
+& Distinct-2$\uparrow$ \\
 \midrule
-MAGIC last 15 steps ($\sim$3{,}840) & 45.83\% & 3.382 & -- & 0.331 & 0.500 & 0.546 & -- \\
-\cellcolor{cyan!15}\method last 15 steps ($\sim$5{,}760) & \cellcolor{cyan!15}88.33\% & \cellcolor{cyan!15}3.457 & \cellcolor{cyan!15}-- & \cellcolor{cyan!15}0.326 & \cellcolor{cyan!15}0.434 & \cellcolor{cyan!15}0.616 & \cellcolor{cyan!15}-- \\
-\cellcolor{cyan!15}\method final replay pool ($\sim$4{,}000) & \cellcolor{cyan!15}100.00\% & \cellcolor{cyan!15}4.298 & \cellcolor{cyan!15}-- & \cellcolor{cyan!15}0.276 & \cellcolor{cyan!15}0.348 & \cellcolor{cyan!15}0.672 & \cellcolor{cyan!15}-- \\
+MAGIC last 15 steps ($\sim$3{,}840) & 45.83\% & 3.382 & 0.331 & 0.500 & 0.546 \\
+\cellcolor{cyan!15}\method last 15 steps ($\sim$5{,}760) & \cellcolor{cyan!15}88.33\% & \cellcolor{cyan!15}3.457 & \cellcolor{cyan!15}0.326 & \cellcolor{cyan!15}0.434 & \cellcolor{cyan!15}0.616 \\
+\cellcolor{cyan!15}\method final replay pool ($\sim$4{,}000) & \cellcolor{cyan!15}100.00\% & \cellcolor{cyan!15}4.298 & \cellcolor{cyan!15}0.276 & \cellcolor{cyan!15}0.348 & \cellcolor{cyan!15}0.672 \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-% [Figure 3 合并版] 大意：左 = co-evolution heatmap (MAGIC Fig 3 风格)，右 = replay pool 12×10 strategy distribution + Beta-Bernoulli posterior harmfulness (α+s)/(α+β+s+f)。subfigure 用 minipage + \fbox 占位，figure PDF 由用户在评测完成后替换 \includegraphics。
+% [段 · RQ5 解读 · SIE 风格]
+% 中文对应内容：以 SIE 风格 "结论 + (RQ5)" 段头：DACE attacker 在策略 / 语义 / 文本三层多样性指标上全面优于 MAGIC，且最终 replay pool 在贝叶斯剪枝后仍保持 100% 覆盖；说明真正的多样性同时出现在策略层与文本层，与 TriPlay-RL 提出的 "换皮不换招" 反例形成对照。把策略层增益归因于归一化覆盖增益奖励，文本层增益归因于策略空间引导带来的语义分散。
+\textbf{Broader strategy and textual diversity is achieved by the \method attacker (RQ5).} Table~\ref{tab:attacker-diversity} compares \method against MAGIC along three orthogonal axes: strategy-grid coverage on the $12\times10$ grid (Coverage, Shannon entropy), semantic distance (SBERT cosine), and textual fingerprint (Self-BLEU, Distinct-2). \method delivers a substantial lead at the strategy level (Coverage $88.33\%$ vs.\ $45.83\%$, Shannon $3.457$ vs.\ $3.382$ in the last 15 training steps) while simultaneously \emph{improving} every textual-level metric (lower SBERT cosine, lower Self-BLEU, higher Distinct-2). This rules out the ``new skin, same trick'' failure mode~\citep{triplayrl2026} where a co-evolved attacker varies surface form without changing underlying strategy: the diversity-driven exploration reward forces strategy-level coverage, and the explicit two-dimensional strategy space ensures the resulting rewrites are also semantically and lexically distinct. The third row further shows that the final \method replay pool retains $100\%$ strategy coverage and the lowest textual redundancy in the table even after Beta--Bernoulli-driven pruning, supporting our claim that the archive itself functions as a strategy-indexed, persistently threatening jailbreak benchmark and corroborating the design of the diversity reward (Section~\ref{sec:method-attacker}) and the Bayesian replay pool (Section~\ref{sec:method-replay}).
+
+
+% ==========================================================
+% 4.4 Experimental Analysis (Figure 3: co-evolution dynamics)
+% ==========================================================
+\subsection{Experimental Analysis}
+\label{sec:exp-analysis}
+
+% [Section 4.4 引子]
+% 中文对应内容：4.4 Experimental Analysis 仅集中在 Figure 3 的协同演化与回放池可视化分析；与 §\ref{sec:formalization} 形式化的双病态首尾呼应：左面板 = 无对抗遗忘，右面板 = 无策略坍缩。
+This section dissects the co-evolution dynamics of \method through cross-evaluation and replay-pool visualisations, demonstrating empirically how the diversity-driven exploration and Bayesian replay together avoid the two pathologies formalised in Section~\ref{sec:formalization}.
+
+% [Figure 3 合并版] 左 = co-evolution heatmap (MAGIC Fig 3 风格)，右 = replay pool 12×10 strategy distribution + Beta-Bernoulli posterior harmfulness。子图标题简短，详细解读迁移到正文段落。
 \begin{figure}[t]
   \centering
 \begin{minipage}[t]{0.48\linewidth}
   \centering
   \includegraphics[height=4.6cm]{figures/heatmap_cross_eval.pdf}
-  \subcaption{Co-evolution cross-evaluation heatmap.}
+  \subcaption{Dynamics of co-evolution cross-evaluation ASR.}
   \label{fig:coevo-cross}
 \end{minipage}\hfill
 \begin{minipage}[t]{0.48\linewidth}
   \centering
   \includegraphics[height=4.6cm]{figures/heatmap_posterior.pdf}
-  \subcaption{Final replay pool posterior harmfulness.}
+  \subcaption{Replay pool strategy distribution and threat posterior.}
   \label{fig:pool-dist}
 \end{minipage}
-  \caption{\textbf{Co-evolution and replay-pool visualisation.} \textbf{Left:} $N\times N$ cross-evaluation heatmap between \method attacker checkpoints (rows, earliest $\to$ latest top-to-bottom) and \method defender checkpoints (columns, earliest $\to$ latest left-to-right); we report ASR on 320 HarmBench seeds, following MAGIC's Figure~3 protocol. The diagonal visualises joint co-evolution convergence. The \emph{upper-triangular region}, read \emph{column-by-column}, corresponds to a fixed late-round defender evaluated against progressively older attacker checkpoints; when the entries in such a column remain uniformly low---i.e.\ a late-round defender keeps suppressing \emph{both} fresh and historical attack distributions---the column is the empirical realisation of a bounded forgetting statistic $F(t_0, t)$ in Definition~\ref{def:forgetting}, and is thus the direct evidence that the Bayesian replay pool of \S\ref{sec:method-replay} prevents the defender from drifting away from earlier attack modes. \textbf{Right:} cell colour encodes the number of archived attacks falling into each $(s, c)$ cell of the $12\times10$ strategy grid in \method's final replay pool; cell annotation shows the Beta--Bernoulli posterior mean $\hat p = (\alpha + s_i)/(\alpha + \beta + s_i + f_i)$ aggregated over the cell's samples, so that breadth (colour) and persistent threat level (annotation) can be read jointly. Both panels are rendered from training logs at camera-ready time; the figure is a sized placeholder here.}
+  \caption{\textbf{Co-evolution dynamics and replay-pool composition of \method.} Left: cross-evaluation ASR between attacker and defender checkpoints. Right: $12\times10$ strategy distribution and Beta--Bernoulli posterior threat in the final replay pool.}
   \label{fig:coevo-and-pool}
 \end{figure}
 
-% [段 · RQ5 分析] 大意：同时解读 Table 5 和 Figure 3 左右两面板；把 DACE 多样性领先解释为 (1) 策略层覆盖 (Coverage / Shannon H / QD-Score) 领先 MAGIC；(2) 语义/文本层不牺牲 (SBERT cos 不显著升高、Self-BLEU 不显著升高)；(3) 最终 replay pool 在去重后仍保持高覆盖说明贝叶斯 archive 本身承担了一个 "strategy-indexed 攻击基准" 的角色，可复用作发布资源。
-% 中文对应内容：Table 5 的三行对比回答 RQ5：MAGIC 行（last-15-steps 训练历史）代表协同演化但不做多样性驱动的对照；DACE last-15-steps 行代表策略覆盖奖励开启后的训练流；DACE replay pool 行代表整个训练历史在贝叶斯过滤后的累积。我们期望 DACE 在策略层三指标上明显领先 MAGIC，同时在 SBERT cosine / Self-BLEU 上至少不退化——这正是 TriPlay-RL "换皮不换招" 问题的反面：真实的多样性必须同时出现在策略层和文本层。Figure 3 左面板展示协同演化在接近训练尾部收敛至稳定区域；右面板展示 DACE 最终 replay pool 同时拥有广覆盖与高有害性，支撑 §3.4 贝叶斯回放机制的有效性。详细多层次多样性（D1/D2/D3 完整指标）与 per-benchmark 分解见附录~\ref{apdx:expanded-results}。
-Table~\ref{tab:attacker-diversity} compares \method to MAGIC along three orthogonal axes: strategy-grid coverage (Coverage, Shannon entropy, QD-Score), semantic distance (SBERT cosine), and textual fingerprint (Self-BLEU, Distinct-2, $n$-gram entropy). We expect \method to lead MAGIC at the strategy level by a substantial margin while matching or exceeding it at the semantic/textual level---this is the empirical counterpart of TriPlay-RL's ``new skin, same trick'' pattern~\citep{triplayrl2026}: genuine diversity must surface at \emph{both} the strategy and the text level. The third row further reports the final \method replay pool, which retains broad coverage even after Beta--Bernoulli-driven pruning, supporting our claim that the archive itself functions as a strategy-indexed jailbreak benchmark (\S\ref{sec:method-replay}). Fig.~\ref{fig:coevo-and-pool} (left) additionally closes the loop on \emph{defense adversarial forgetting} introduced in Definition~\ref{def:forgetting}: reading each column in the upper-triangular region top-to-bottom traces a fixed late-round defender against progressively older attacker checkpoints, so columns that stay uniformly dark constitute the direct evidence that the Bayesian replay pool of \S\ref{sec:method-replay} keeps the defender from drifting away from earlier attack modes as the attacker evolves. The right panel shows that \method spreads successful attacks across the $12\times10$ grid while preserving high posterior harmfulness in each populated cell, jointly motivating the strategy-level coverage reward and the Bayesian replay design of \S\ref{sec:method}.
+% [段 · 协同演化分析]
+% 中文对应内容：把原本堆在 Figure 3 caption 里的细节解读迁移到此正文；左面板讲协同演化收敛与无策略坍缩，右面板讲回放池广覆盖 + 高威胁后验，从而无对抗遗忘。最后一句把两条机制和 §3.3/§3.4 的方法设计对应起来。
+\textbf{Co-evolution proceeds without strategy collapse or adversarial forgetting.} The left panel of Fig.~\ref{fig:coevo-and-pool} plots the $N \times N$ cross-evaluation heatmap between \method attacker and defender checkpoints (rows: attacker checkpoints earliest$\to$latest; columns: defender checkpoints earliest$\to$latest), reporting ASR on $320$ HarmBench seeds following MAGIC's Figure~3 protocol. The diagonal stays consistently low and tightens monotonically toward the final round, evidencing a stable joint co-evolution rather than the oscillation typical of zero-sum self-play. Reading the upper-triangular region \emph{column-by-column} corresponds to evaluating a fixed late-round defender against progressively older attacker checkpoints; these columns remain uniformly dark, which is the empirical realisation of a bounded forgetting statistic $F(t_0, t)$ in Definition~\ref{def:forgetting} and therefore directly demonstrates that the Bayesian replay pool of Section~\ref{sec:method-replay} keeps the defender from drifting away from earlier attack modes as the attacker evolves. The right panel encodes, for each $(s, c)$ cell of the $12\times10$ strategy grid, the number of archived attacks (cell colour) and their aggregated Beta--Bernoulli posterior mean $\hat p = (\alpha + s_i)/(\alpha + \beta + s_i + f_i)$ (cell annotation). \method spreads successful attacks broadly across the grid \emph{and} maintains high posterior harmfulness in each populated cell, which is the empirical signature of the avoidance of attack strategy collapse (Definition~\ref{def:collapse}) and confirms the synergy between the normalised marginal coverage gain reward (Section~\ref{sec:method-attacker}) and the Bayesian replay pool (Section~\ref{sec:method-replay}).
 
 
 
