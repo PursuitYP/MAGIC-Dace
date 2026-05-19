@@ -1,0 +1,7 @@
+# Requirements for the eval-dace adapter layer.
+# All of these are already installed in the `OpenRT` conda env used by
+# eval-dace; this file is informational / for standalone installs.
+openai>=1.0
+numpy>=1.24
+pandas>=2.0
+tqdm>=4.65

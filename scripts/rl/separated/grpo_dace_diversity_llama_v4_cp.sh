@@ -53,7 +53,9 @@ project_name=game
 # experiment_name="D-q257bi-A-q257bisft_wocode-reward1_0.5_0-woDformat-wo_label_reward-revised_label-tp2-${timestamp}"
 # experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-w_magic_sft-${timestamp}"
 # experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-wo_sft-${timestamp}"
-experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-defender1st_${timestamp}"
+# experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-defender1st_${timestamp}"
+### dace: llama3.1-8B-Instruct attacker+defender v4 RL, defender first ###
+experiment_name="DACE-Diversity-Llama3.1_8B_Instruct-w_dace_sft_v4-defender1st_${timestamp}"
 
 # DEFENDER BASE MODEL
 LLAMA_38BI_MODEL_PATH=$WORKSPACE/models/Meta-Llama-3-8B-Instruct/snapshots/8afb486c1db24fe5011ec46dfbe5b5dccdb575c2
@@ -85,11 +87,19 @@ QWEN257BI_SFT_DACE_MODEL_PATH=/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/
 QWEN257BI_SFT_DACE_8G_MODEL_PATH=/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-sft/qwen2d5-7b_v3_full_sft_dsz2/checkpoint-7395
 ### dace: v4 SFT attacker checkpoint — produced by qwen2d5-7b_v4_full_sft_dsz2.yaml (12-risk strategy space + over-refusal oriented BENIGN_TEMPLATE). Update checkpoint-N to the final step when SFT finishes. ###
 ### dace: v4 — allow env override; fail fast when the v4 SFT ckpt isn't a real directory ###
-QWEN257BI_SFT_DACE_V4_MODEL_PATH=/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-sft/qwen2d5-7b_v4_full_sft_dsz2/checkpoint-7281
-if [[ ! -d "$QWEN257BI_SFT_DACE_V4_MODEL_PATH" ]]; then
-  echo "[v4] ERROR: QWEN257BI_SFT_DACE_V4_MODEL_PATH='${QWEN257BI_SFT_DACE_V4_MODEL_PATH}' is not a directory." >&2
+# QWEN257BI_SFT_DACE_V4_MODEL_PATH=/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-sft/qwen2d5-7b_v4_full_sft_dsz2/checkpoint-7281
+# if [[ ! -d "$QWEN257BI_SFT_DACE_V4_MODEL_PATH" ]]; then
+#   echo "[v4] ERROR: QWEN257BI_SFT_DACE_V4_MODEL_PATH='${QWEN257BI_SFT_DACE_V4_MODEL_PATH}' is not a directory." >&2
+#   echo "       Set it to the real Phase-2 checkpoint before running, e.g.:" >&2
+#   echo "         export QWEN257BI_SFT_DACE_V4_MODEL_PATH=.../qwen2d5-7b_v4_full_sft_dsz2/checkpoint-9200" >&2
+#   exit 2
+# fi
+### dace: llama3.1-8B v4 SFT attacker checkpoint — produced by llama3d1-8b_v4_full_sft_dsz2.yaml ###
+LLAMA31_8BI_SFT_DACE_V4_MODEL_PATH=/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-sft/llama3d1-8b_v4_full_sft_dsz2/checkpoint-7281
+if [[ ! -d "$LLAMA31_8BI_SFT_DACE_V4_MODEL_PATH" ]]; then
+  echo "[v4] ERROR: LLAMA31_8BI_SFT_DACE_V4_MODEL_PATH='${LLAMA31_8BI_SFT_DACE_V4_MODEL_PATH}' is not a directory." >&2
   echo "       Set it to the real Phase-2 checkpoint before running, e.g.:" >&2
-  echo "         export QWEN257BI_SFT_DACE_V4_MODEL_PATH=.../qwen2d5-7b_v4_full_sft_dsz2/checkpoint-9200" >&2
+  echo "         export LLAMA31_8BI_SFT_DACE_V4_MODEL_PATH=.../llama3d1-8b_v4_full_sft_dsz2/checkpoint-7281" >&2
   exit 2
 fi
 QWEN2514B_SFT_MODEL_PATH=$PROJECT_DIR/src/360-LLaMA-Factory/saves/qwen2.5-14BI-cot_w_harm_gemini/full/sft/checkpoint-9705
@@ -171,7 +181,7 @@ PYTHONUNBUFFERED=1 python -m verl.separated_trainer.main_ppo \
     trainer.total_epochs=1 \
     trainer.total_training_steps=300 \
     algorithm.adv_estimator=grpo \
-    algorithm.switch_agent.model_paths=[${QWEN257BI_SFT_DACE_V4_MODEL_PATH},${QWEN_257BI_MODEL_PATH}] \
+    algorithm.switch_agent.model_paths=[${LLAMA31_8BI_SFT_DACE_V4_MODEL_PATH},${LLAMA_318BI_MODEL_PATH}] \
     algorithm.switch_agent.agent_roles=[attacker,defender] \
     algorithm.switch_agent.train_roles=[attacker,defender] \
     algorithm.switch_agent.start_agent=defender \

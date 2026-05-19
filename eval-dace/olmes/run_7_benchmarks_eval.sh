@@ -11,7 +11,9 @@
 # MODEL_NAME=nocot-s210-q257b-it
 
 # MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_full-2026-04-26_22-00-31/global_step_300/defender/actor/huggingface"
-MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
+# MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
+MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-2026-05-03_14-30-23/global_step_300/defender/actor/huggingface"
+MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
 # RESULTS_BASE_DIR="/mnt/shared-storage-user/wenxiaoyu/game-private/eval/olmes/results/ablation/$MODEL_NAME/7benchmarks-$(date +%Y%m%d_%H%M%S)"
 RESULTS_BASE_DIR="/mnt/shared-storage-user/yupeng/MAGIC/eval-dace/olmes/results/dace/$MODEL_NAME-$(date +%Y%m%d_%H%M%S)"
 mkdir -p $RESULTS_BASE_DIR
@@ -64,7 +66,7 @@ fi
 
 # 定义所有任务
 TASKS=(
-  "ifeval"
+#   "ifeval"
   "arc_challenge"
   "gpqa"
 #   "truthfulqa"

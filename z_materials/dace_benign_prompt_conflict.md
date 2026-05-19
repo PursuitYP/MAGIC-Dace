@@ -1,5 +1,11 @@
 # BENIGN_TEMPLATE 语义冲突分析
 
+> **[2026-05-01 UPDATE]**：本文档描述的冲突已在 **v4 全流水线重建（plan 第四轮）** 中采用**方案 A（保守）**修复，落地到：
+> - `data/safety/preprocess_dace.py` 的 `BENIGN_TEMPLATE`（Win 1 改为 over-refusal 目标；新增 Lose 2 禁止 actual harmful intent；新增 Lose 3 on-topic 约束）
+> - `data-sft/distill_v4_vanilla_benign_jsonl.py` 同步的内嵌 BENIGN_TEMPLATE
+>
+> 详见 `dace_v4_rebuild_decisions.md`。本文档保留作设计依据。
+
 ## 摘要
 
 `data/safety/preprocess_dace.py` 里 `BENIGN_TEMPLATE`（第 94-105 行）的"Win conditions"与 DACE 框架"benign 样本应检验过拒"的设计意图存在直接语义冲突。实验证据显示该冲突是 DACE SFT 训练后 `reward/refusal_rate_benign` 飙到 0.3-0.5 的主因。

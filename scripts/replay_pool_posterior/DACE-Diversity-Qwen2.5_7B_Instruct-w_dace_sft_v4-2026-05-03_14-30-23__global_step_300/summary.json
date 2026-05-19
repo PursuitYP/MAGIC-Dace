@@ -1,0 +1,18 @@
+{
+  "pool_path": "/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-2026-05-03_14-30-23/global_step_300/archive_pool.json",
+  "pool_tag": "DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-2026-05-03_14-30-23__global_step_300",
+  "threshold": 0.5,
+  "alpha_prior": 1.0,
+  "beta_prior": 1.0,
+  "filter_stats": {
+    "n_total": 4000,
+    "n_bad_strategy": 0,
+    "n_dropped_zero_trials": 0,
+    "n_dropped_threshold": 273
+  },
+  "kept_counts": {
+    "all": 3727,
+    "vanilla_harmful": 1378,
+    "vanilla_benign": 2349
+  }
+}

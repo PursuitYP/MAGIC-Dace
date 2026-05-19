@@ -7,15 +7,22 @@
 # ============================================================================
 
 # 配置
-BASE_CHECKPOINT_DIR="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/wenxiaoyu/game"
-EXPERIMENT_NAME="v5-D-q257bi-A-sft_wocode-ratio11-freq15-reward1_0.5_0-woDformat-wo_label_reward-revised_label-2026-01-17_09-37-46"
+# BASE_CHECKPOINT_DIR="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/wenxiaoyu/game"
+# EXPERIMENT_NAME="v5-D-q257bi-A-sft_wocode-ratio11-freq15-reward1_0.5_0-woDformat-wo_label_reward-revised_label-2026-01-17_09-37-46"
+BASE_CHECKPOINT_DIR="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated"
+EXPERIMENT_NAME="DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_full-2026-04-26_22-00-31"
 # v3-D-q257bi-A-sftv4-balanced-reward1_0.5_0.5-woDformat-ratio21-freq10-add_label_reward-revised_label-2026-01-04_14-57-52"
 #ATTACKER_STEPS=(30 45 60 90 105 120 150 165 180 210 225 240 270 285 300)
 #DEFENDER_STEPS=(15 75 135 195 255)
-ATTACKER_STEPS=(30 60 90)
-DEFENDER_STEPS=(15 45 75)
+# ATTACKER_STEPS=(30 60 90)
+# DEFENDER_STEPS=(15 45 75)
+ATTACKER_STEPS=(15 45 75 105 135)
+# ATTACKER_STEPS=(135)
+# DEFENDER_STEPS=(30 60 90 120)
+DEFENDER_STEPS=(0)
 
-BASE_RESULTS_DIR="/mnt/shared-storage-user/wenxiaoyu/game-private/eval/safety-eval-fork/results/eval-1.18/heatmap-cross-eval-$(date +%Y%m%d_%H%M%S)"
+# BASE_RESULTS_DIR="/mnt/shared-storage-user/wenxiaoyu/game-private/eval/safety-eval-fork/results/eval-1.18/heatmap-cross-eval-$(date +%Y%m%d_%H%M%S)"
+BASE_RESULTS_DIR="/mnt/shared-storage-user/yupeng/MAGIC/eval-dace/safety-eval-fork/results/dace/heatmap-cross-eval-$(date +%Y%m%d_%H%M%S)"
 
 # 环境变量
 export WILDGUARD_API_ENDPOINT='http://s-20251119153749-lp69w-decode.ailab-safethm.svc:23344/v1'
@@ -43,7 +50,7 @@ SKIPPED_COUNT=0
 
 # 嵌套循环：对每个attacker测试所有defender
 for ATTACKER_STEP in "${ATTACKER_STEPS[@]}"; do
-    ATTACKER_MODEL_PATH="${BASE_CHECKPOINT_DIR}/checkpoints/Game-separated/${EXPERIMENT_NAME}/global_step_${ATTACKER_STEP}/attacker/actor/huggingface"
+    ATTACKER_MODEL_PATH="${BASE_CHECKPOINT_DIR}/${EXPERIMENT_NAME}/global_step_${ATTACKER_STEP}/attacker/actor/huggingface"
     
     # 检查attacker模型是否存在
     if [ ! -d "$ATTACKER_MODEL_PATH" ]; then
@@ -64,7 +71,8 @@ for ATTACKER_STEP in "${ATTACKER_STEPS[@]}"; do
         echo "Defender Step: $DEFENDER_STEP"
         echo "========================================"
         
-        DEFENDER_MODEL_PATH="${BASE_CHECKPOINT_DIR}/checkpoints/Game-separated/${EXPERIMENT_NAME}/global_step_${DEFENDER_STEP}/defender/actor/huggingface"
+        # DEFENDER_MODEL_PATH="${BASE_CHECKPOINT_DIR}/${EXPERIMENT_NAME}/global_step_${DEFENDER_STEP}/defender/actor/huggingface"
+        DEFENDER_MODEL_PATH="${BASE_CHECKPOINT_DIR}/${EXPERIMENT_NAME}/global_step_${DEFENDER_STEP}"
         RESULTS_DIR="${BASE_RESULTS_DIR}/A${ATTACKER_STEP}_vs_D${DEFENDER_STEP}"
         mkdir -p $RESULTS_DIR
         

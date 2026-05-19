@@ -1,103 +1,186 @@
 # MAJIC: Markovian Adaptive Jailbreaking via Iterative Composition of Diverse Innovative Strategies
 
-[![Paper](https://img.shields.io/badge/Paper-arXiv-red)](https://arxiv.org/abs/2508.13048)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+Fork of [MAJIC (AAAI 2026)](https://arxiv.org/abs/2508.13048) adapted to the
+**eval-dace** pipeline (`eval-dace/OpenRT/run_eval.sh`) so MAJIC can be run as
+a Table 3 attack alongside PAIR / TAP / AutoDAN-turbo-r against the DACE
+defender.
 
-Official implementation of **"MAJIC: Markovian Adaptive Jailbreaking via Iterative Composition of Diverse Innovative Strategies"** (AAAI 2026).
+## What's different from upstream
 
-## Overview
+The upstream repo (`methods/`, `markov_methods/`, `majic.py`) relies on
+HuggingFace pipelines and contains placeholder API keys (`"xxx"`), making it
+unrunnable as-is. We keep the upstream sources untouched (they document the
+10 disguise-strategy prompt templates) and add a thin adapter under
+`majic_eval/` that:
 
-MAJIC is a black-box jailbreak framework combining **10 semantic obfuscation methods** with **Markov chain optimization** to evaluate LLM safety vulnerabilities.
+- talks only to OpenAI-compatible Chat Completions endpoints (DACE defender,
+  base-attacker, GPT-4o judge) so it matches `OpenRT/run_eval.sh`;
+- implements the paper's Markov matrix, Q-learning update, α-decay and
+  β-reset faithfully;
+- exposes all **three Table-4 matrix initialization modes** via one env var.
 
-### Key Features
-
-- 10 obfuscation methods: Hypothetical, Historical, Spatial, Reverse, Security, Word-level, Character-level, Literary, Language, Emoji
-- Markov Transition Matrix for adaptive method selection
-- Q-learning inspired dynamic optimization
-- Multi-model support: GPT-4, Claude, Llama, Gemini
-- Multiple evaluation judges: GPT-4, Llama Guard, rule-based
-
-## Installation
-
-```bash
-git clone https://github.com/ZJU-LLM-Safety/MAJIC-AAAI2026.git
-cd MAJIC-AAAI2026
-pip install -r requirements.txt
-```
-
-## Quick Start
-
-### 1. Configure API Keys
-
-Copy and edit the configuration template:
+## Quickstart
 
 ```bash
-cp config_template.py config.py
-# Edit config.py with your API keys
+conda activate OpenRT            # openai / numpy / pandas / tqdm are already installed
+cd eval-dace/MAJIC
+bash run_majic.sh                # defaults: uniform init + HarmBench CSV
 ```
 
-### 2. Prepare Dataset
+Results are written to
+`results/dace/<MODEL_NAME>-<ts>/majic/{history,summary,majic}_*.{json,log}`
+using the same file layout as `OpenRT/unified_eval.py::save_results`.
 
-Place your harmful behavior dataset in `data/`:
+## How to run
 
-```json
-[{"goal": "Your harmful query here"}]
-```
-
-### 3. Run Attack
+### 1. Activate the env and enter the MAJIC dir
 
 ```bash
-# Single method attack
-python methods/m1_hypo_attackLLM.py
-
-# Full MAJIC framework with Markov optimization
-python markov_methods/markov_attack_api_dynamic.py
+conda activate OpenRT
+cd eval-dace/MAJIC
 ```
 
-## Project Structure
+### 2. Configure endpoints (optional — defaults match `OpenRT/run_eval.sh`)
 
-```
-MAJIC-AAAI2026/
-├── methods/              # 10 obfuscation methods (m1-m10)
-│   ├── m1_hypo_attackLLM.py
-│   ├── m2_history_attackLLM.py
-│   └── ...
-├── markov_methods/       # Markov optimization framework
-│   ├── markov_attack_api_dynamic.py
-│   └── norm_matrix.py
-├── data/                 # Datasets
-├── majic.py             # Main entry point
-└── config_template.py   # Configuration template
-```
+`run_majic.sh` reads the same env vars as the OpenRT launcher; override only
+what you need:
 
-## Usage
+```bash
+# DACE defender (victim)
+export DEFENDER_API_BASE_URL="http://<defender-host>:<port>/v1"
+export DEFENDER_API_KEY="FAKE_API_KEY"
+export DEFENDER_API_MODEL="orm"
 
-### Single Method
+# Base attacker (Qwen / Llama / Mistral — whatever you self-deploy)
+export ATTACKER_API_BASE_URL="http://<attacker-host>:<port>/v1"
+export ATTACKER_API_KEY="FAKE_API_KEY"
+export ATTACKER_API_MODEL="orm"
+export ATTACKER_ANSWER_EXTRACT="true"   # set to "false" if attacker doesn't emit <answer>...</answer>
 
-```python
-from methods.m1_hypo_attackLLM import hypo_method
+# GPT-4o judge (OpenAI-compatible)
+export OPENAI_API_KEY="sk-..."
+export OPENAI_BASE_URL="http://<judge-host>:<port>/v1/"
+export JUDGE_MODEL="gpt-4o"
 
-score, prompt, response = hypo_method(
-    suffix="none",
-    harmful_prompt="Your query",
-    attacker_pipe=attacker_pipeline,
-    attacker_tokenizer=tokenizer,
-    victim_pipe=victim_pipeline,
-    victim_tokenizer=tokenizer,
-    judgetype="gpt",
-    attacktype="gpt-4o",
-    iter_num=10
-)
+# Naming for output dir
+export MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
 ```
 
-### Full Framework
+### 3. Default run (uniform init, HarmBench CSV)
 
-Configure parameters in `markov_attack_api_dynamic.py`:
-- `chain_count`: Attack chains per query (default: 10)
-- `chain_length`: Max optimization steps (default: 3)
-- `init_qnum`: Initial method queries (default: 1)
-- `chain_qnum`: Optimization queries (default: 1)
+```bash
+bash run_majic.sh
+```
+
+### 4. Smoke test (2 prompts, 1-step chain)
+
+```bash
+NUM_SAMPLES=2 \
+MAJIC_CHAIN_COUNT=1 MAJIC_CHAIN_LENGTH=1 \
+bash run_majic.sh
+```
+
+### 5. Switch the matrix initialization mode
+
+| `MAJIC_INIT_MODE` | Variant | Paper ASR on GPT-4o | Needs `.npy`? |
+| --- | --- | --- | --- |
+| `uniform` (default) | MAJIC(–Init) | 70.3% | No |
+| `learned` | Full MAJIC | 95.7% | Yes |
+| `learned_static` | MAJIC(–DynUpd) | 76.5% | Yes |
+
+```bash
+# uniform (default; MAJIC(-Init), Table 4)
+MAJIC_INIT_MODE=uniform bash run_majic.sh
+
+# learned: full MAJIC -- requires a pre-built 10x10 matrix
+MAJIC_INIT_MODE=learned \
+MAJIC_INIT_MATRIX="$PWD/markov_methods/init_matrix.npy" \
+bash run_majic.sh
+
+# learned_static: MAJIC(-DynUpd) -- frozen matrix, no Q-learning update
+MAJIC_INIT_MODE=learned_static \
+MAJIC_INIT_MATRIX="$PWD/markov_methods/init_matrix.npy" \
+bash run_majic.sh
+```
+
+### 6. Switch the dataset
+
+```bash
+# HarmBench CSV (default, aligned with run_eval.sh)
+DATASET_PATH=/mnt/shared-storage-user/wenxiaoyu/game-private/eval/OpenRT/seed/harmbench/harmbench_behaviors_text_test.csv \
+bash run_majic.sh
+
+# MAJIC repo-internal 400-prompt JSON
+DATASET_PATH=data/harmbench400.json bash run_majic.sh
+
+# 50-sample subset bundled with the repo
+DATASET_PATH=data/harmful_behaviors_50.json bash run_majic.sh
+```
+
+### 7. Build the learned matrix (offline, one-time)
+
+Required only for `MAJIC_INIT_MODE=learned` / `learned_static`:
+
+```bash
+python -m majic_eval.build_init_matrix \
+    --target-api-key "$DEFENDER_API_KEY" --target-base-url "$DEFENDER_API_BASE_URL" --target-model "$DEFENDER_API_MODEL" \
+    --attacker-api-key "$ATTACKER_API_KEY" --attacker-base-url "$ATTACKER_API_BASE_URL" --attacker-model "$ATTACKER_API_MODEL" \
+    --judge-api-key "$OPENAI_API_KEY"  --judge-base-url "$OPENAI_BASE_URL"  --judge-model gpt-4o \
+    --local-dataset data/harmful_behaviors_50.json \
+    --out markov_methods/init_matrix.npy
+```
+
+### 8. Run the orchestrator directly (for ad-hoc flag tweaking)
+
+`run_majic.sh` is a thin shell wrapper around the same Python entry point
+used by every other Table-3 attack; you can call it directly:
+
+```bash
+python -m majic_eval.runner \
+    --target-api-key "$DEFENDER_API_KEY" --target-base-url "$DEFENDER_API_BASE_URL" --target-model "$DEFENDER_API_MODEL" \
+    --attacker-api-key "$ATTACKER_API_KEY" --attacker-base-url "$ATTACKER_API_BASE_URL" --attacker-model "$ATTACKER_API_MODEL" \
+    --judge-api-key "$OPENAI_API_KEY"  --judge-base-url "$OPENAI_BASE_URL"  --judge-model gpt-4o \
+    --dataset-path /mnt/shared-storage-user/.../harmbench_behaviors_text_test.csv \
+    --init-mode uniform \
+    --chain-count 10 --chain-length 3 \
+    --results-dir ./results/dace/$MODEL_NAME-$(date +%Y%m%d_%H%M%S) \
+    --attacker-answer-extract
+```
+
+### 9. Inspect the results
+
+After a run finishes:
+
+```bash
+# Top-level artefacts
+ls results/dace/<MODEL_NAME>-<ts>/majic/
+#   history_<ts>.json   per-sample AttackResult dicts + chain history
+#   summary_<ts>.json   attack-success-rate, avg-queries, init mode, matrix snapshots
+#   majic_<ts>.log      mirrored stdout (DualLogger)
+
+# Quick ASR / AQC peek
+python - <<'PY'
+import json, glob, os
+for s in sorted(glob.glob("results/dace/*/majic/summary_*.json"))[-1:]:
+    with open(s) as f: m = json.load(f)["metrics"]
+    print(s)
+    print(f"  init_mode={m['init_mode']}  ASR={m['attack_success_rate']:.2%}  "
+          f"AQC={m['avg_queries_per_sample']:.1f}  matrix_changed={m['matrix_changed']}")
+PY
+```
+
+## Entry points
+
+| File | Purpose |
+| --- | --- |
+| `run_majic.sh` | Shell launcher; mirrors `eval-dace/OpenRT/run_eval.sh`. |
+| `majic_eval/runner.py` | Attack orchestrator (`python -m majic_eval.runner ...`). |
+| `majic_eval/build_init_matrix.py` | Offline matrix initialization tool. |
+| `majic_eval/strategies.py` | 10-strategy disguise prompts (carved from `methods/`). |
+| `majic_eval/markov.py` | Markov transition matrix + three init modes. |
+| `majic_eval/judge.py` | PAIR-style GPT-4o judge (OpenAI-compatible). |
+| `majic_eval/api_client.py` | Chat client + credential resolution. |
+| `methods/`, `markov_methods/` | Upstream research artifacts (kept for reference). |
 
 ## Citation
 
@@ -115,12 +198,4 @@ Configure parameters in `markov_attack_api_dynamic.py`:
 
 ## License
 
-MIT License - see LICENSE file for details.
-
-## Ethical Use
-
-This tool is for security research and red teaming only. Users are responsible for ethical and legal compliance.
-
-## Contact
-
-For questions, please open an issue or contact: zjuqww@gmail.com
+MIT (see LICENSE).

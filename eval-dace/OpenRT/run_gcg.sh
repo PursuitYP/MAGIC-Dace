@@ -31,7 +31,8 @@ ATTACKER_ANSWER_EXTRACT="true"
 # Judge/Attacker Configuration (OpenAI/Compatible)
 # Used for judging results
 # export OPENAI_API_KEY="sk-xI8zGRXkgJzoejUP7KtcBbRfqNazmWnFqSNuw6zMn5rZClFy"
-export OPENAI_API_KEY="sk-ua4rD1WerZKpDyb7JHOSKxVvMmvMZIKi6rXGPotdX9nfxNXr"
+# export OPENAI_API_KEY="sk-ua4rD1WerZKpDyb7JHOSKxVvMmvMZIKi6rXGPotdX9nfxNXr"
+export OPENAI_API_KEY="sk-K6VceMUqp4nb0awvQ6Mp8leG4HDsqJ557AW1r6Z8umNpnRX2"     # api-key from jc
 # export OPENAI_BASE_URL="https://api.boyuerichdata.opensphereai.com/v1"
 export OPENAI_BASE_URL="http://35.220.164.252:3888/v1/"
 
@@ -56,8 +57,17 @@ EMBEDDING_MODEL="text-embedding-3-small"
 
 # [GCG Only] Local path to the model weights (HuggingFace format)
 # LOCAL_MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/wenxiaoyu/game/checkpoints/Game-separated/v5-D-l318bi-A-l318bisft_wocode-ratio11-freq15-reward1_0.5_0-woDformat-wo_label_reward-revised_label-2026-01-19_09-42-38/global_step_195/defender/actor/huggingface"
-LOCAL_MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_full-2026-04-26_22-00-31/global_step_300/defender/actor/huggingface"
-MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
+# LOCAL_MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_full-2026-04-26_22-00-31/global_step_300/defender/actor/huggingface"
+# MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
+# LOCAL_MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-defender1st_2026-05-03_14-47-05/global_step_300/defender/actor/huggingface"
+# MODEL_NAME="DACE-Qwen2.5-7B-v4-step300"
+# LOCAL_MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-2026-05-03_14-30-23/global_step_250/defender/actor/huggingface"
+# MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step250"
+# LOCAL_MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-defender1st_2026-05-03_14-47-05/global_step_250/defender/actor/huggingface"
+# MODEL_NAME="DACE-Qwen2.5-7B-v4-step250"
+LOCAL_MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-2026-05-03_14-30-23/global_step_300/defender/actor/huggingface"
+MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
+
 
 # ------------------------------------------------------------------------------
 # 3. Task Selection

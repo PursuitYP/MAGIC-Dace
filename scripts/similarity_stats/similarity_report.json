@@ -1,0 +1,90 @@
+{
+  "intra": {
+    "dace_history": {
+      "N": 3840,
+      "dim": 1536,
+      "mean_pairwise_cosine_exact": 0.33093501047364765,
+      "sampled_pairs": 199949,
+      "std_pairwise_cosine_sampled": 0.10664062947034836,
+      "sampled_percentiles": {
+        "p5": 0.16641964316368105,
+        "p25": 0.257112979888916,
+        "p50": 0.32583847641944885,
+        "p75": 0.39913269877433777,
+        "p95": 0.5148156642913818
+      }
+    },
+    "magic_history": {
+      "N": 3840,
+      "dim": 1536,
+      "mean_pairwise_cosine_exact": 0.32606852913085005,
+      "sampled_pairs": 199949,
+      "std_pairwise_cosine_sampled": 0.10776408761739731,
+      "sampled_percentiles": {
+        "p5": 0.1585084617137909,
+        "p25": 0.2523235082626343,
+        "p50": 0.32287371158599854,
+        "p75": 0.39429301023483276,
+        "p95": 0.5075321435928345
+      }
+    },
+    "dace_replay_pool": {
+      "N": 4000,
+      "dim": 1536,
+      "mean_pairwise_cosine_exact": 0.2772134283570893,
+      "sampled_pairs": 199952,
+      "std_pairwise_cosine_sampled": 0.10291324555873871,
+      "sampled_percentiles": {
+        "p5": 0.12295691147446633,
+        "p25": 0.20410402491688728,
+        "p50": 0.26894547045230865,
+        "p75": 0.34198299050331116,
+        "p95": 0.45945599079132066
+      }
+    }
+  },
+  "cross": {
+    "dace_history__vs__magic_history": {
+      "NA": 3840,
+      "NB": 3840,
+      "mean_pairwise_cosine_exact": 0.2822845798068576,
+      "sampled_pairs": 200000,
+      "std_pairwise_cosine_sampled": 0.09382382035255432,
+      "sampled_percentiles": {
+        "p5": 0.1393517419695854,
+        "p25": 0.21722792088985443,
+        "p50": 0.2759130299091339,
+        "p75": 0.3403845876455307,
+        "p95": 0.4460889294743537
+      }
+    },
+    "dace_history__vs__dace_replay_pool": {
+      "NA": 3840,
+      "NB": 4000,
+      "mean_pairwise_cosine_exact": 0.21605849609375,
+      "sampled_pairs": 200000,
+      "std_pairwise_cosine_sampled": 0.08716688305139542,
+      "sampled_percentiles": {
+        "p5": 0.0851883627474308,
+        "p25": 0.15438542142510414,
+        "p50": 0.20931552350521088,
+        "p75": 0.27116790413856506,
+        "p95": 0.37016939818859096
+      }
+    },
+    "magic_history__vs__dace_replay_pool": {
+      "NA": 3840,
+      "NB": 4000,
+      "mean_pairwise_cosine_exact": 0.20282766927083334,
+      "sampled_pairs": 200000,
+      "std_pairwise_cosine_sampled": 0.08648204058408737,
+      "sampled_percentiles": {
+        "p5": 0.0707144808024168,
+        "p25": 0.14202222228050232,
+        "p50": 0.19717927277088165,
+        "p75": 0.2576310709118843,
+        "p95": 0.35399795174598686
+      }
+    }
+  }
+}

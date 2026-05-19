@@ -9,7 +9,7 @@ finetuning_type: full
 deepspeed: examples/deepspeed/ds_z2_config.json
 
 ### dataset
-dataset: game_cot_dace_v1nv2_v3_harmful,game_cot_dace_v1nv2_v3_benign
+dataset: game_cot_dace_v2_harmful,game_cot_dace_v2_benign
 template: qwen
 cutoff_len: 32768
 # max_samples: 1000

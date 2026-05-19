@@ -1,0 +1,243 @@
+\pdfoutput=1
+
+% \section{TMP: LOSSES AND CLIPS}
+% \subsection{Original GRPO}
+% Sample-level (Trajectory Level) loss:
+% \begin{align}
+% &J_{\mathrm{GRPO}}(\theta)\\
+% &=
+% \mathbb{E}_{(q,a)\sim\mathcal{D},\;\{o_i\}_{i=1}^G\sim\pi_{\theta_{\mathrm{old}}}(\cdot\mid q)}\\
+% &\Biggl[
+% \frac{1}{G}
+% \sum_{i=1}^G
+% \frac{1}{\lvert o_i\rvert}
+% \sum_{l=1}^{\lvert o_i\rvert}
+% \Bigl(
+% \min\bigl(r_{i,l}(\theta)\,\hat A_{i,l},\,
+% \mathrm{clip}\bigl(r_{i,l}(\theta),\,1-\epsilon,\,1+\epsilon\bigr)\,\hat A_{i,l}\bigr)
+% -\beta\,D_{\mathrm{KL}}\bigl(\pi_\theta\|\pi_{\mathrm{ref}}\bigr)
+% \Bigr)
+% \Biggr], 
+% \end{align}
+% where 
+% \begin{align}
+% r_{i,l}(\theta)
+% &=
+% \frac{
+% \pi_\theta\bigl(o_{i,l}\mid q,\,o_{i,<l}\bigr)
+% }{
+% \pi_{\theta_{\mathrm{old}}}\bigl(o_{i,l}\mid q,\,o_{i,<l}\bigr)
+% }.
+% \end{align}
+% Token-level loss:
+% \begin{align}
+% &J_{\mathrm{GRPO}}(\theta)\\
+% &=
+% \mathbb{E}_{(q,a)\sim\mathcal{D},\;\{o_i\}_{i=1}^G\sim\pi_{\theta_{\mathrm{old}}}(\cdot\mid q)}\\
+% &\Biggl[
+% \frac{1}{\sum_{i=1}^G \lvert o_i\rvert}
+% \sum_{i=1}^G
+% \sum_{l=1}^{\lvert o_i\rvert}
+% \Bigl(
+% \min\bigl(r_{i,l}(\theta)\,\hat A_{i,l},\,
+% \mathrm{clip}\bigl(r_{i,l}(\theta),\,1-\epsilon,\,1+\epsilon\bigr)\,\hat A_{i,l}\bigr)
+% -\beta\,D_{\mathrm{KL}}\bigl(\pi_\theta\|\pi_{\mathrm{ref}}\bigr)
+% \Bigr)
+% \Biggr]
+% \end{align}
+
+% \subsection{Multi-Turn}
+% \textbf{trajectory-level} loss and \textbf{token-level} clip
+% \begin{align}
+% J_{\mathrm{GRPO}}(\theta)
+% &=
+% \mathbb{E}_{(q,a)\sim\mathcal{D},\;\{o_i\}_{i=1}^G\sim\pi_{\theta_{\mathrm{old}}}(\cdot\mid q)}\\
+% &
+% \Biggl[
+% \frac{1}{G}
+% \sum_{i=1}^G
+% \frac{1}{T}
+% \sum_{t=1}^{T}
+% \frac{1}{\lvert o_{i,t}\rvert}
+% \sum_{l=1}^{\lvert o_{i,t}\rvert}
+% \Bigl(
+% \min\bigl(r_{i,t,l}(\theta)\,\hat A_{i,t,l},\,
+% \mathrm{clip}\bigl(r_{i,t,l}(\theta),\,1-\epsilon,\,1+\epsilon\bigr)\,\hat A_{i,t,l}\bigr)
+% -\beta\,D_{\mathrm{KL}}\bigl(\pi_\theta\|\pi_{\mathrm{ref}}\bigr)
+% \Bigr)
+% \Biggr],
+% \end{align}
+% where 
+% \begin{align}
+% r_{i,l,t}(\theta)
+% &=
+% \frac{
+% \pi_\theta\bigl(o_{i,t,l}\mid q,\,o_{i,t,<l}\bigr)
+% }{
+% \pi_{\theta_{\mathrm{old}}}\bigl(o_{i,t,l}\mid q,\,o_{i,t,<l}\bigr)
+% }.
+% \end{align}
+
+% trajectory-level loss and \textbf{turn-level} clip
+% \begin{align}
+% J_{\mathrm{GRPO}}(\theta)
+% &=
+% \mathbb{E}_{(q,a)\sim\mathcal{D},\;\{o_i\}_{i=1}^G\sim\pi_{\theta_{\mathrm{old}}}(\cdot\mid q)}\\
+% &
+% \Biggl[
+% \frac{1}{G}
+% \sum_{i=1}^G
+% \frac{1}{T_i}
+% \sum_{t=1}^{T_i}
+% \frac{1}{\lvert o_{i,t}\rvert}
+% \sum_{l=1}^{\lvert o_{i,t}\rvert}
+% \Bigl(
+% \min\bigl({\color{red}r_{i,t}(\theta)}\,\hat A_{i,t,l},\,
+% \mathrm{clip}\bigl({\color{red}r_{i,t}}(\theta),\,1-\epsilon,\,1+\epsilon\bigr)\,\hat A_{i,t,l}\bigr)
+% -\beta\,D_{\mathrm{KL}}\bigl(\pi_\theta\|\pi_{\mathrm{ref}}\bigr)
+% \Bigr)
+% \Biggr],
+% \end{align}
+% where 
+% \begin{align}
+% {\color{red}r_{i,t}(\theta)}
+% &= \frac{1}{|o_{i,t}|}\sum\limits_{l=1}^{|o_{i,t}|}
+% \frac{
+% \pi_\theta\bigl(o_{i,t,l}\mid q,\,o_{i,t,<l}\bigr)
+% }{
+% \pi_{\theta_{\mathrm{old}}}\bigl(o_{i,t,l}\mid q,\,o_{i,t,<l}\bigr)
+% }.
+% \end{align}
+
+% \textbf{turn-level} loss and \textbf{turn-level} clip
+% \begin{align}
+% J_{\mathrm{GRPO}}(\theta)
+% &=
+% \mathbb{E}_{(q,a)\sim\mathcal{D},\;\{o_i\}_{i=1}^G\sim\pi_{\theta_{\mathrm{old}}}(\cdot\mid q)}\\
+% &
+% \Biggl[
+% {\color{red}\frac{1}{\sum_{i=1}^G T_i}}
+% \sum_{i=1}^G
+% \sum_{t=1}^{T}
+% \frac{1}{\lvert o_{i,t}\rvert}
+% \sum_{l=1}^{\lvert o_{i,t}\rvert}
+% \Bigl(
+% \min\bigl(r_{i,t}(\theta)\,\hat A_{i,t,l},\,
+% \mathrm{clip}\bigl(r_{i,t}(\theta),\,1-\epsilon,\,1+\epsilon\bigr)\,\hat A_{i,t,l}\bigr)
+% -\beta\,D_{\mathrm{KL}}\bigl(\pi_\theta\|\pi_{\mathrm{ref}}\bigr)
+% \Bigr)
+% \Biggr].
+% \end{align}
+
+% \textbf{token-level} loss and \textbf{token-level} clip
+% \begin{align}
+% J_{\mathrm{GRPO}}(\theta)
+% &=
+% \mathbb{E}_{(q,a)\sim\mathcal{D},\;\{o_i\}_{i=1}^G\sim\pi_{\theta_{\mathrm{old}}}(\cdot\mid q)}\\
+% &
+% \Biggl[
+% {\color{red}\frac{1}{\sum_{i=1}^G \sum_{t=1}^{T} \lvert o_{i,t}\rvert}}
+% \sum_{i=1}^G
+% \sum_{t=1}^{T}
+% \sum_{l=1}^{\lvert o_{i,t}\rvert}
+% \Bigl(
+% \min\bigl(r_{i,t,l}(\theta)\,\hat A_{i,t,l},\,
+% \mathrm{clip}\bigl(r_{i,t,l}(\theta),\,1-\epsilon,\,1+\epsilon\bigr)\,\hat A_{i,t,l}\bigr)
+% -\beta\,D_{\mathrm{KL}}\bigl(\pi_\theta\|\pi_{\mathrm{ref}}\bigr)
+% \Bigr)
+% \Biggr].
+% \end{align}
+
+\section{Preliminaries}
+\label{sec:preliminaries}
+
+In this section, we outline the formulation of the vanilla reasoning process (Sec. \ref{sec:preliminaries.vrp}) and the representative training methods (Sec. \ref{sec:preliminaries.rl}) along with the notation used throughout the paper. 
+
+\subsection{Vanilla Reasoning Process (VRP)}
+\label{sec:preliminaries.vrp}
+The probability of generating a response $\mathbf{y}$ equals the product of its stepwise probabilities. Given a model $\pi_\theta$ and a prompt $\mathbf{x}=(x_1,\dots,x_N)$, the \textbf{vanilla reasoning process} (VRP) autoregressively produces a response $\mathbf{y}=(y_1,\dots,y_L)$ with
+% The decoding process of a language model can be formalized as a series of sequential token predictions, where the overall probability is equal to the product of the probabilities at each individual step.
+% Given a language model $\pi_\theta$ parameterized by $\theta$, and a task prompt $\mathbf{x}=(x_0, x_1, \ldots, x_N)$ of $N$ tokens, 
+% the \textbf{vanilla reasoning process} (VRP) autoregressively generates
+% a response $\mathbf{y}=(y_0, y_1, \ldots, y_L)$ of $L$ tokens. 
+% The probability of generating $\mathbf{y}$
+% is
+\begin{equation*}
+    \pi_\theta(\mathbf{y}|\mathbf{x}) = \prod\limits_{l=1}^{L} \pi_\theta(y_l|x_1, x_2, \ldots x_N, y_1, \ldots, y_{l-1})
+    = \prod\limits_{l=1}^{L} \pi_\theta(\mathbf{y}_{l} | \mathbf{x}, \mathbf{y}_{<l})
+\end{equation*}
+The response usually contains intermediate reasoning steps before arriving at the final answer, this process is also known as \textbf{chain-of-thought} (CoT) \citep{wei2022chain}, which can be represented as:
+\begin{equation}
+    \mathbf{x} 
+    \xrightarrow{\text{reasoning steps}} \mathbf{y} 
+    % \rightarrow
+    \sim
+    \mathbf{a},
+    \label{eq:cot}
+\end{equation}
+where $\mathbf{a}$ is the extracted final answer, which is included in the answer $\mathbf{y}$.
+
+
+% \subsection{RL for Eliciting Complex Reasoning Behaviors \ys{Reinforcement Learning on Reasoning?}}
+\subsection{Training VRP via Reinforcement Learning}
+\label{sec:preliminaries.rl}
+RL frames VRP decoding process as a \textit{deterministic}, token‐level Markov Decision process (MDP) \citep{wang2024openr}. Its objective is
+% Building upon the vanilla reasoning process, reinforcement learning provides an effective framework for optimizing LLM outputs. The decoding strategy of LLM naturally follows the vanilla reasoning process and can further be formulated as a \textit{deterministic} token-level Markov Decision process (MDP) \citep{wang2024openr}. The optimization objective function can be denoted as follows:
+\begin{equation*}
+    \mathcal{J}(\theta) = \mathbb{E}_{(\mathbf{x}, \mathbf{y}^*)\sim \mathcal{D}, \mathbf{y}\sim \pi_\theta}\left[ R(\mathbf{y}, \mathbf{y}^*) \right].
+\end{equation*}
+where $R(\cdot, \cdot)$ represents a reward function comparing generated answer $\mathbf{y}$ with the golden answer $\mathbf{y^*}$ for any question $\mathbf{x}$ sampled from dataset $\mathcal{D}$.
+% To compute the gradient of the loss function with respect to the policy $\pi_\theta$, the REINFORCE algorithm \citep{DBLP:journals/ml/Williams92} applies the log-derivative trick.
+% % Specifically, it computes the gradient as follows:
+% % $$
+% % \nabla_\theta \mathcal{L}(\theta) = \mathbb{E}_{(\mathbf{x}, \mathbf{y}^*)\sim \mathcal{D}, \mathbf{y}\sim \pi_\theta}\left[ -\nabla_\theta \log\pi_\theta(\mathbf{y}\mid \mathbf{x}) \mathcal{R}(\mathbf{y}, \mathbf{y}^*) \right].
+% % $$
+% Since strict online sampling and gradient calculation can be computationally expensive, proximal policy optimization (PPO) \citep{DBLP:journals/corr/SchulmanWDRK17} is widely adopted for its high training stability and sampling efficiency. The PPO objective function is:
+% \begin{equation}
+%     \mathcal{J}(\theta) = \mathbb{E}_{(\mathbf{x}, \mathbf{y}^*)\sim \mathcal{D}, \mathbf{y}\sim \pi_\mathrm{old}} \left[\min\left( r(\mathbf{y})  A^{\pi_\mathrm{old}}, \text{clip} (r(\mathbf{y}), 1-\epsilon, 1+\epsilon)A^{\pi_\mathrm{old}}\right)  \right],
+% \end{equation}
+% where $r(\mathbf{y})=\frac{\pi_\theta (\mathbf{y|x})}{\pi_\mathrm{old}(\mathbf{y|x})}$ denotes the ratio between current and the old policy, $A^{\pi_\mathrm{old}}$ is the advantage of policy $\pi_\mathrm{old}$, which can be estimated with a critic model by GAE \citep{schulman2015high}. 
+
+% Practically when deploying RL training for large language models, considerations of computational efficiency and scalability have led to the elimination of critic models. 
+% Several critic-free approaches like GRPO \citep{shao2024deepseekmath} and REINFORCE++ \citep{hu2025reinforce++} introduce group or batch level advantage estimation. 
+% These methods can maintain performance while significantly reducing computational overhead and simplifying the training process. 
+To compute the gradient $\nabla_\theta\mathcal{J}(\theta)$, computationally efficient algorithms GRPO \citep{shao2024deepseekmath} and REINFORCE++ \citep{hu2025reinforce++} are widely adopted.
+Take GRPO as an example, given a question-answer pair $\mathbf{x}, \mathbf{y}^*$ and a group of $G$ generated responses $\mathbf{y}_i$, denote $\mathbf{y}_{i,j}$ as the $j$-th token of the $i$-th response, it optimizes the following token-level objective:
+{\small\begin{equation}
+    \begin{aligned}
+        \mathcal{J}(\theta)&=
+        \mathbb{E}_{(\mathbf{x}, \mathbf{y}^*)\sim\mathcal{D},\;\{\mathbf{y}_i\}_{i=1}^G\sim\pi_{\theta_{\mathrm{old}}}(\cdot\mid \mathbf{x})} \\
+        &\Biggl[
+            \frac{1}{G}
+            \sum_{i=1}^G
+            \frac{1}{\lvert \mathbf{y}_i\rvert}
+            \sum_{j=1}^{\lvert \mathbf{y}_i\rvert}
+            \Bigl(
+                \min\bigl(r_{i,j}(\theta)\,\hat A_{i,j},\,
+                \mathrm{clip}\bigl(r_{i,j}(\theta),\,1-\epsilon,\,1+\epsilon\bigr)\,\hat A_{i,j}\bigr)
+                -\beta\,D_{\mathrm{KL}}\bigl(\pi_\theta\|\pi_{\mathrm{ref}}\bigr)
+            \Bigr)
+        \Biggr], 
+    \end{aligned}
+    \label{eq:grpo}
+\end{equation}}
+where the token-level ratio $r_{i,j}(\theta)$ and the group-normalized advantage $\hat A_{i,j}$ are defined as:
+\begin{align*}
+    r_{i,j}(\theta)
+    &=
+    \frac{
+    \pi_\theta\bigl(\mathbf{y}_{i,j}\mid \mathbf{x},\,\mathbf{y}_{i,<j}\bigr)
+    }{
+    \pi_{\theta_{\mathrm{old}}}\bigl(\mathbf{y}_{i,j}\mid \mathbf{x},\,\mathbf{y}_{i,<j}\bigr)
+    },
+    \hat{A}_{i,j} = \frac{R_i - \text{mean}(\{R_i\}_{i=1}^G)}{\text{std}(\{R_i\}_{i=1}^G)}.
+\end{align*}
+
+% where the  is the normalized reward using group statistics:
+% \begin{align}
+% \hat{A}_{i,l} = \frac{r_i - \text{mean}(\{R_i\}_{i=1}^G)}{\text{std}(\{R_i\}_{i=1}^G)}.
+% \end{align}
+
+However, RL on base LLMs that haven't been well-aligned may suffer from issues like poor readability and language mixing, preventing researchers from verifying, understanding, and further developing their LLMs. And huge searching space makes efficient learning of meta-thinking daunting.
+
+

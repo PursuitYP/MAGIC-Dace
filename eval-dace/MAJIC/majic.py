@@ -1,28 +1,16 @@
-"""
-MAJIC: MArkov Jailbreak with Iterative Camouflage
-Main entry point for running jailbreak attacks
+"""MAJIC eval-dace CLI shim.
+
+This file used to aggregate the upstream HuggingFace-based method modules,
+which depend on local GPU inference and are not compatible with the
+eval-dace API-only pipeline. We leave those modules in place as research
+artifacts and expose the new runnable adapter instead.
+
+Running ``python3 majic.py`` (or ``python3 -m majic_eval``) is equivalent
+to ``python3 -m majic_eval.runner``.
 """
 
-from methods.m1_hypo_attackLLM import hypo_method
-from methods.m2_history_attackLLM import history_method
-from methods.m3_space_attackLLM import space_method
-from methods.m4_reverse_attackLLM import reverse_method
-from methods.m5_security_attackLLM import security_method
-from methods.m6_word_attackLLM import word_method
-from methods.m7_char_attackLLM import char_method
-from methods.m8_literary_attackLLM import literary_method
-from methods.m9_language_attackLLM import language_method
-from methods.m10_emoji_attack import emoji_method
+from majic_eval.runner import main
 
-__all__ = [
-    'hypo_method',
-    'history_method',
-    'space_method',
-    'reverse_method',
-    'security_method',
-    'word_method',
-    'char_method',
-    'literary_method',
-    'language_method',
-    'emoji_method'
-]
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,180 @@
+\pdfoutput=1
+
+
+\documentclass{article} % For LaTeX2e
+\usepackage[preprint]{neurips_2025}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\usepackage{graphicx}
+\usepackage{xspace}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{algorithm}
+\usepackage{algorithmic}
+\usepackage{amsmath}
+\usepackage{multirow}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{courier}
+\usepackage{subcaption}  
+\usepackage{ulem}
+\usepackage{xcolor}
+\usepackage{makecell}
+\usepackage{colortbl}
+\usepackage{natbib}
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \usepackage{tcolorbox}
+
+% \newcounter{qaCounter} % Create a new counter for Q&A sessions
+% \setcounter{qaCounter}{1} % Start the counter at 1
+
+% \newtcolorbox{multiqa}[1][]{
+%   colback=gray!10, colframe=black, sharp corners, boxrule=1pt,
+%   fonttitle=\bfseries,
+%   title=Q\&A Session \arabic{qaCounter},
+%   before upper={\stepcounter{qaCounter}},
+%   width=.8\textwidth, % Adjust width to 80% of line width
+% }
+
+% \newtcolorbox{questionlayer}[1][]{
+%   colback=blue!10!white, colframe=blue!70, sharp corners, boxrule=0.5pt,
+%   title=Question: #1,
+%   width=.8\textwidth, % Adjust width as needed
+% }
+
+% \newtcolorbox{answerlayer}[1][]{
+%   colback=green!5!white, colframe=green!75!black, sharp corners, boxrule=0.5pt,
+%   title=Answer:,
+%   width=.8\textwidth, % Adjust width as needed
+% }
+
+% \newtcolorbox{reasonlayer}[1][]{
+%   colback=yellow!10!white, colframe=yellow!75!black, sharp corners, boxrule=0.5pt,
+%   title=Reason:,
+%   width=.8\textwidth, % Adjust width as needed
+% }
+% %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+% notations
+\makeatletter
+\DeclareRobustCommand\onedot{\futurelet\@let@token\@onedot}
+\def\@onedot{\ifx\@let@token.\else.\null\fi\xspace}
+\normalem
+\def\eg{\emph{e.g}\onedot} \def\Eg{\emph{E.g}\onedot}
+\def\ie{\emph{i.e}\onedot} \def\Ie{\emph{I.e}\onedot}
+\def\cf{\emph{c.f}\onedot} \def\Cf{\emph{C.f}\onedot}
+\def\etc{\emph{etc}\onedot} \def\vs{\emph{vs}\onedot}
+\def\wrt{w.r.t\onedot} \def\dof{d.o.f\onedot}
+\def\etal{\emph{et al}\onedot}
+\makeatother
+
+\newcommand{\argminvar}{\text{argmin}}
+\newcommand{\argmaxvar}{\text{argmax}}
+\DeclareRobustCommand{\method}{ReMA}
+% \newcommand{\method}{{ReMA}}
+
+\newcommand{\diffcolor}[1]{%
+    \ifdim #1 pt > 0 pt
+        \textcolor{red}{+#1\%}%
+    \else
+        \textcolor{gray}{#1\%}%
+    \fi
+}
+
+\usepackage[textsize=tiny]{todonotes}
+\newcommand{\ziyu}[1]{{\bf \color{magenta} [Ziyu: #1]}}
+\newcommand{\wxy}[1]{{\bf \color{orange} [Xiaoyu: #1]}}
+\newcommand{\yx}[1]{{\bf \color{purple} [Yunxiang: #1]}}
+\newcommand{\ys}[1]{{  \color{cyan} [YanSong: #1]}}
+
+\newcommand{\yly}[1]{{\bf \color{red} [Linyi: #1]}}
+
+\newcommand{\ying}[1]{{\bf \color{blue} [Ying: #1]}}
+
+\newcommand{\hj}[1]{{\bf \color{brown} [Hanjing: #1]}}
+
+\newcommand{\hldel}[1]{%
+  \bgroup%
+  \sout{\phantom{#1}}% Draw a horizontal line
+  \llap{#1}% Overlay the text
+  \egroup%
+}
+
+\title{\method: Learning to Meta-think for LLMs with Multi-agent Reinforcement Learning}
+
+% Authors must not appear in the submitted version. They should be hidden
+% as long as the \iclrfinalcopy macro remains commented out below.
+% Non-anonymous submissions will be rejected without review.
+
+\author{Ziyu Wan\textsuperscript{1,2}\thanks{Equal contribution.} \thanks{Work done during internship at Shanghai Artificial Intelligence Laboratory}, 
+Yunxiang Li\textsuperscript{3}\footnotemark[1], 
+Xiaoyu Wen\textsuperscript{1,2},
+Yan Song\textsuperscript{4}, 
+Hanjing Wang\textsuperscript{1},
+Linyi Yang\textsuperscript{4},\\
+\textbf{Mark Schmidt\textsuperscript{3}}, 
+\textbf{Jun Wang\textsuperscript{4}},
+\textbf{Weinan Zhang\textsuperscript{1}},
+\textbf{Shuyue Hu\textsuperscript{2}}\thanks{Corresponding Author}, 
+\textbf{Ying Wen\textsuperscript{1}}\footnotemark[3] \\
+% \thanks{ Use footnote for providing further information
+% about author (webpage, alternative address)---\emph{not} for acknowledging
+% funding agencies.  Funding acknowledgements go at the end of the paper.} 
+\\
+\textsuperscript{1} Shanghai Jiao Tong University\\
+\textsuperscript{2} Shanghai Artificial Intelligence Laboratory\\
+\textsuperscript{3} University of British Columbia\\
+\textsuperscript{4} University College London\\
+% \texttt{\{alex\_wan,ying.wen\}@sjtu.edu.cn} \\
+% \And
+% Ji Q. Ren \& Yevgeny LeNet \\
+% Department of Computational Neuroscience \\
+% University of the Witwatersrand \\
+% Joburg, South Africa \\
+% \texttt{\{robot,net\}@wits.ac.za} \\
+% \AND
+% Coauthor \\
+% Affiliation \\
+% Address \\
+% \texttt{email}
+}
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to \LaTeX{} to determine where to break
+% the lines. Using \AND forces a linebreak at that point. So, if \LaTeX{}
+% puts 3 of 4 authors names on the first line, and the last on the second
+% line, try using \AND instead of \And before the third author name.
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+%\iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+
+\maketitle
+\input{sections/abstract}
+\input{sections/intro}
+\input{sections/preliminaries}
+\input{sections/method}
+\input{sections/experiment}
+\input{sections/conclusion}
+
+\newpage
+% \bibliography{iclr2025_conference}
+% \bibliographystyle{iclr2025_conference}
+
+\bibliographystyle{plainnat}
+\bibliography{neurips_2025_conference}
+
+\appendix
+
+\input{sections/appendix}
+% \input{sections/checklist}
+
+\end{document}
+

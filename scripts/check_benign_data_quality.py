@@ -15,8 +15,10 @@ base_url = "http://s-20251119153749-lp69w-decode.ailab-safethm.svc:23344/v1"
 api_key = '{{FAKE_API_KEY}}'
 
 DATA_FILES = {
-    "magic": "src/360-LLaMA-Factory/data/game_cot_benign.json",
-    "dace":  "src/360-LLaMA-Factory/data/game_cot_dace_v1nv2_v3_benign.json",
+    # "magic": "src/360-LLaMA-Factory/data/game_cot_benign.json",
+    # "dace":  "src/360-LLaMA-Factory/data/game_cot_dace_v1nv2_v3_benign.json",
+    ### dace: v4 Guard check entry ###
+    "dace_v4": "src/360-LLaMA-Factory/data/game_cot_dace_v4_benign.json",
 }
 
 CACHE_DIR = Path("scripts/check_benign_cache")
@@ -148,4 +150,4 @@ def main():
 if __name__ == "__main__":
     main()
 
-# python3 scripts/check_benign_data_quality.py
+# python scripts/check_benign_data_quality.py

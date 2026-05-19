@@ -3,8 +3,10 @@
 # 配置
 # MODEL_PATH="/mnt/shared-storage-user/wenxiaoyu/hezhida/TROJail/checkpoints/MUSE_D/lora_merged/all_pairs/global_step_60"
 # MODEL_NAME="muse-s60"
-MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_full-2026-04-26_22-00-31/global_step_300/defender/actor/huggingface"
-MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
+# MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_full-2026-04-26_22-00-31/global_step_300/defender/actor/huggingface"
+# MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
+MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-2026-05-03_14-30-23/global_step_300/defender/actor/huggingface"
+MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
 
 # Qwen defender 模型建议使用 game_defender
 # 如果切到普通 instruct 模型，可改成 "hf"

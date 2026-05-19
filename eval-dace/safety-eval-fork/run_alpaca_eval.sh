@@ -30,7 +30,8 @@ export ALPACA_EVAL_SKIP_CONTENT_FILTER=1
 # 任务与结果配置
 #MODEL_NAME="def-direct_harm_pair_large_step39" # 对应 DefenderAPIModel
 # MODEL_NAME="q257i"
-MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
+# MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
+MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
 TASKS="alpacaeval"
 # RESULTS_DIR="./results/multi-turn-defense/$MODEL_NAME-alpaca/alpacaeval/-$(date +%Y%m%d_%H%M%S)"
 RESULTS_DIR="/mnt/shared-storage-user/yupeng/MAGIC/eval-dace/safety-eval-fork/results/dace/$TASKS-$MODEL_NAME-$(date +%Y%m%d_%H%M%S)"

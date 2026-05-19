@@ -972,7 +972,7 @@ Self-RedTeam~\citep{liu2025chasing} formulates jailbreak red-teaming as zero-sum
     TriPlay-RL   & tri-role self-play & no  & textual & no & -- & no \\
     ACE-Safety   & tree-group MCTS    & no  & no  & no & -- & no \\
     SEAS         & self-evolve        & no  & no  & no & -- & no \\
-    \rowcolor{cyan!8}\textbf{\method (ours)} & asym.\ sequential & \textbf{yes $12{\times}10$} & \textbf{KL} & \textbf{yes} & \textbf{Beta--Bernoulli} & \textbf{yes} \\
+    \rowcolor{cyan!8}\textbf{\method (ours)} & asym.\ sequential & \textbf{yes} & \textbf{KL} & \textbf{yes} & \textbf{Beta--Bernoulli} & \textbf{yes} \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -1082,14 +1082,7 @@ The attack-style axis is taken verbatim from Rainbow Teaming~\citep{samvelyan202
 \subsection{Strategy descriptor extraction.}
 \label{apdx:descriptor-extraction}
 
-Rather than running an auxiliary LLM judge to label $b(x)$ post-hoc---which would create a circular dependency between the diversity reward and a third model's biases---\method requires the attacker to \emph{declare} its chosen $(s, c)$ inside the structured \texttt{<strategy>} block of every rollout (Appendix~\ref{apdx:prompts}). At training time, descriptor extraction is a deterministic two-pass procedure: (i) a strict regular expression matches the verbatim category and style names on the two lines of \texttt{<strategy>}; (ii) on a regex miss, a fuzzy substring fallback (token-level Jaccard $\geq 0.7$ against the canonical names) recovers descriptors despite minor formatting drift. Self-declared descriptors are protected against reward hacking through three complementary safeguards: the SFT warm-start trains the attacker to produce declared strategies that match the realised rewrite text; the format reward $R_{\mathrm{fmt}}$ (Section~\ref{sec:method-reward}) explicitly penalises malformed or out-of-grid declarations; and a post-hoc descriptor-faithfulness audit (Appendix~\ref{apdx:bench-audit}) reports per-cell precision/recall of the self-declared $(s, c)$ against an independent multi-label re-annotation of the realised text.
-
-\begin{figure}[h]
-  \centering
-  \fbox{\rule[-2.0cm]{0pt}{4.0cm}\rule[-2.0cm]{0.95\linewidth}{0pt}}
-  \caption{\textbf{Empirical evidence for the 12$\times$10 pruning.} Per-category frequency in the SFT distillation set (left), in the online archive pool at the final training step (middle), and the benign mis-classification rate from Llama-Guard-4 (right). S12 Sexual Content and S14 Code Interpreter Abuse are outliers on all three axes; pruning them concentrates supervision on the 12 reliably covered cells.}
-  \label{fig:pruning-evidence}
-\end{figure}
+Rather than running an auxiliary LLM judge to label $b(x)$ post-hoc---which would create a circular dependency between the diversity reward and a third model's biases---\method requires the attacker to \emph{declare} its chosen $(s, c)$ inside the structured \texttt{<strategy>} block of every rollout (Appendix~\ref{apdx:prompts}). At training time, descriptor extraction is a deterministic two-pass procedure: (i) a strict regular expression matches the verbatim category and style names on the two lines of \texttt{<strategy>}; (ii) on a regex miss, a fuzzy substring fallback (token-level Jaccard $\geq 0.7$ against the canonical names) recovers descriptors despite minor formatting drift. Self-declared descriptors are protected against reward hacking through two complementary safeguards: the SFT warm-start trains the attacker to produce declared strategies that match the realised rewrite text, and the format reward $R_{\mathrm{fmt}}$ (Section~\ref{sec:method-reward}) explicitly penalises malformed or out-of-grid declarations.
 
 \subsection{Uniform balancing of the SFT distillation set.}
 \label{apdx:sft-balance}
@@ -1105,7 +1098,7 @@ To avoid systematic frequency imbalances inherited from the seed sources, we ass
 
 % [App A 引子]
 % 中文对应内容：本附录给出 DACE 训练主循环的完整伪代码与超参对应表。算法 A.1 对应正文 §3.1 的 Phase 2 迭代协同演化流程，并补充了 time decay、Thompson 采样、posterior 更新和剪枝的每一步细节。表 A.1 罗列所有主实验默认超参及其在开源实现中的对应位置，方便一键复现。
-Algorithm~\ref{alg:dace-full} gives the full pseudocode of \method, exposing all data structures, boundary cases, and the hyperparameters used in our main experiments. Table~\ref{tab:hyperparams} lists the corresponding hyperparameter values and the exact location at which each one is consumed in the released implementation.
+Algorithm~\ref{alg:dace-full} gives the full pseudocode of \method, exposing all data structures, boundary cases, and the hyperparameters used in our main experiments. Table~\ref{tab:hyperparams} lists the corresponding hyperparameter values.
 
 \begin{algorithm}[h]
   \caption{\method training loop (full)}
@@ -1151,22 +1144,22 @@ Algorithm~\ref{alg:dace-full} gives the full pseudocode of \method, exposing all
   \small
   \caption{\textbf{\method training hyperparameters} (main-experiment defaults).}
   \label{tab:hyperparams}
-  \setlength{\tabcolsep}{4pt}
-  \begin{tabular}{llll}
+  \setlength{\tabcolsep}{6pt}
+  \begin{tabular}{lll}
     \toprule
-    \textbf{Group} & \textbf{Symbol} & \textbf{Default} & \textbf{Code path} \\
+    \textbf{Group} & \textbf{Symbol} & \textbf{Default} \\
     \midrule
-    Coverage smoothing    & $\varepsilon_{\mathrm{div}}$ & $10^{-8}$ & \texttt{archive\_pool.compute\_div} \\
-    Coverage clip         & $\mathtt{clip\_negative}$ & \texttt{true} & \texttt{archive\_pool.compute\_div} \\
-    Diversity coefficient & $(\lambda_{\mathrm{succ}}, \lambda_{\mathrm{fail}})$ & $(1.0, 0.5)$ & \texttt{archive\_pool.compute\_div} \\
-    Time decay            & $\gamma$ & $0.90$ & \texttt{archive\_pool.time\_decay} \\
-    Beta prior            & $(\alpha, \beta)$ & $(1.0, 1.0)$ & \texttt{archive\_pool.\_post\_mean} \\
-    Prune threshold       & $\tau_{\mathrm{prune}}$ & $0.45$ & \texttt{archive\_pool.prune} \\
-    Prune min trials      & $n_{\min}$ & $2$ & \texttt{archive\_pool.prune} \\
-    Archive capacity      & max\_pool\_size & $4000$ & \texttt{archive\_pool.add\_entry} \\
-    Replay batch          & $B_{\mathrm{replay}}$ & $32$ & \texttt{trainer.replay\_pool} \\
-    Training batch        & $B_{\mathrm{train}}$ & $64$ & \texttt{trainer.ppo.ray\_trainer} \\
-    Rollout $n$           & -- & $6$ & \texttt{actor\_rollout\_ref.rollout.n} \\
+    Coverage smoothing    & $\varepsilon_{\mathrm{div}}$ & $10^{-8}$ \\
+    Coverage clip         & $\mathtt{clip\_negative}$ & \texttt{true} \\
+    Diversity coefficient & $(\lambda_{\mathrm{succ}}, \lambda_{\mathrm{fail}})$ & $(1.0, 0.5)$ \\
+    Time decay            & $\gamma$ & $0.90$ \\
+    Beta prior            & $(\alpha, \beta)$ & $(1.0, 1.0)$ \\
+    Prune threshold       & $\tau_{\mathrm{prune}}$ & $0.45$ \\
+    Prune min trials      & $n_{\min}$ & $2$ \\
+    Archive capacity      & max\_pool\_size & $4000$ \\
+    Replay batch          & $B_{\mathrm{replay}}$ & $32$ \\
+    Training batch        & $B_{\mathrm{train}}$ & $64$ \\
+    Rollout $n$           & $G$ & $6$ \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -1184,7 +1177,7 @@ We expand the compact pseudocode of Algorithm~\ref{alg:dace-full} with the expli
 
 \paragraph{Shared GRPO objective.} Following~\citet{shao2024grpo, guo2025deepseek}, both the attacker update on $R_A$ and the defender update on $R_D$ minimise the clipped surrogate loss
 \begin{equation}
-  \mathcal{L}_{\mathrm{GRPO}}(\theta) \;=\; -\,\mathbb{E}_{\tau}\!\left[\frac{1}{G}\sum_{i=1}^{G}\Big(\min\!\big(\rho_i\,\hat A_i,\ \mathrm{clip}(\rho_i,\,1{-}\epsilon,\,1{+}\epsilon)\,\hat A_i\big) \;-\; \beta\,\KL\!\big(\pi_\theta\,\|\,\pi_{\mathrm{ref}}\big)\Big)\right],
+  \mathcal{L}_{\mathrm{GRPO}}(\theta) \;=\; -\,\mathbb{E}_{\tau}\!\left[\frac{1}{G}\sum_{i=1}^{G}\Big(\min\!\big(\rho_i\,\hat A_i,\ \mathrm{clip}(\rho_i,\,1{-}\epsilon,\,1{+}\epsilon)\,\hat A_i\big) \;+\; \beta\,\KL\!\big(\pi_\theta\,\|\,\pi_{\mathrm{ref}}\big)\Big)\right],
   \label{eq:grpo-loss}
 \end{equation}
 where $\rho_i = \pi_\theta(o_i\mid p)\,/\,\pi_{\mathrm{old}}(o_i\mid p)$ is the importance ratio for the $i$-th rollout $o_i$ generated from prompt $p$, $\hat A_i$ is its group-relative advantage, $\epsilon$ is the PPO-style clip range, and $\beta$ controls the KL anchor to the reference policy. For the attacker, $p$ is a seed query $q$ and $o_i$ is a rewrite $y_A^{(i)}$; for the defender, $p$ is an attack prompt $x_j\in\mathcal{D}_{\mathrm{train}}$ and $o_i$ is a response $y_D^{(i)}$.
@@ -1263,10 +1256,10 @@ This appendix records the hardware configuration, the data and seed protocol, an
 We run \method and all co-evolution baselines on a single 8$\times$H100 node using veRL~\citep{sheng2025verl} with GRPO as the inner optimizer. The defender uses FSDP sharding and vLLM-based rollouts; the attacker is co-located on the same node through veRL's hybrid-engine mechanism. Each RL round (Stage~1 + Stage~2) takes roughly the same wall-clock time across the three co-evolution methods, so the comparison is approximately wall-clock-matched.
 
 \paragraph{Data, seeds, and reporting protocol.}
-The attacker SFT corpus is distilled by Gemini-2.5-Pro~\citep{comanici2025gemini} from the Jailbreak-R1 harmful seeds and the WildJailBreak benign split, with the md5-balancing scheme of Appendix~\ref{apdx:sft-balance} producing $\sim$20K harmful + $\sim$20K benign three-part CoT examples. The RL phase samples 15{,}000 vanilla harmful and 15{,}000 vanilla benign WildJailBreak prompts as seeds. The in-training safety judge is Qwen3Guard~\citep{zhao2025qwen3guard}. Co-evolution uses the ratio-based agent-switching schedule from MAGIC (1:1 attacker:defender ratio, update frequency 15 steps). All main-table rows are the mean across three independent training seeds; per-seed standard deviations appear in Appendix~\ref{apdx:bench-seed-std}. To make rows directly comparable, every baseline reuses the same SFT corpus, defender backbone, and judge as \method.
+The attacker SFT corpus is distilled by Gemini-2.5-Pro~\citep{comanici2025gemini} from the Jailbreak-R1 harmful seeds and the WildJailBreak benign split, with the md5-balancing scheme of Appendix~\ref{apdx:sft-balance} producing $\sim$20K harmful + $\sim$20K benign three-part CoT examples. The RL phase samples 15{,}000 vanilla harmful and 15{,}000 vanilla benign WildJailBreak prompts as seeds. The in-training safety judge is Qwen3Guard~\citep{zhao2025qwen3guard}. Co-evolution uses the ratio-based agent-switching schedule from MAGIC (1:1 attacker:defender ratio, update frequency 15 steps). All main-table rows are the mean across three independent training seeds. To make rows directly comparable, every baseline reuses the same SFT corpus, defender backbone, and judge as \method.
 
 \paragraph{Optimization and GRPO hyperparameters.}
-Table~\ref{tab:rl-hyperparams} lists the inner GRPO and optimizer hyperparameters that are shared across \method and the co-evolution baselines. \method-specific knobs (coverage smoothing $\varepsilon_{\mathrm{div}}$, diversity coefficient $\lambda$, time decay $\gamma$, Beta prior $(\alpha, \beta)$, prune thresholds $(\tau_{\mathrm{prune}}, n_{\min})$, archive capacity, replay batch $B_{\mathrm{replay}}$) are collected in Table~\ref{tab:hyperparams} together with their entry points in the released code.
+Table~\ref{tab:rl-hyperparams} lists the inner GRPO and optimizer hyperparameters that are shared across \method and the co-evolution baselines. \method-specific knobs (coverage smoothing $\varepsilon_{\mathrm{div}}$, diversity coefficient $\lambda$, time decay $\gamma$, Beta prior $(\alpha, \beta)$, prune thresholds $(\tau_{\mathrm{prune}}, n_{\min})$, archive capacity, replay batch $B_{\mathrm{replay}}$) are collected in Table~\ref{tab:hyperparams}.
 
 \begin{table}[h]
   \centering
@@ -1315,7 +1308,7 @@ We describe each benchmark used in the main paper in a \texttt{\textbackslash pa
 \label{apdx:bench-safety}
 
 % 中文对应内容：以下七个静态安全基准覆盖 adversarial harmful / vanilla harmful / adversarial benign / vanilla benign 四类分布。我们统一在 Qwen3Guard 的 safety moderator 上汇报 ASR 与 RTA，并在附录 F.5 中附上 GPT-4o / Llama-Guard-4 的交叉验证。介绍文字直接沿用 MAGIC~\citep{magic2025} 附录 §B.2 的写法以保持评测口径完全一致。
-\paragraph{Evaluation setup.} Unless otherwise stated, we set the sampling temperature to $0$ and cap the generation length at $8{,}192$ tokens, including both the reasoning process and the final answer. We then truncate the final answer to $512$ tokens and feed it to the judge model to assess harmfulness and refusal. This evaluation pipeline strictly follows the implementation in~\citet{liu2025chasing}. For Qwen2.5 family defenders we use Qwen3Guard~\citep{zhao2025qwen3guard} as the judge model; we additionally cross-validate with GPT-4o and Llama-Guard-4 in Appendix~\ref{apdx:bench-audit} to rule out judge-specific artifacts.
+\paragraph{Evaluation setup.} Unless otherwise stated, we set the sampling temperature to $0$ and cap the generation length at $8{,}192$ tokens, including both the reasoning process and the final answer. We then truncate the final answer to $512$ tokens and feed it to the judge model to assess harmfulness and refusal. This evaluation pipeline strictly follows the implementation in~\citet{liu2025chasing}. For Qwen2.5 family defenders we use Qwen3Guard~\citep{zhao2025qwen3guard} as the judge model.
 
 \paragraph{HarmBench.} HarmBench~\citep{mazeika2024harmbench} is a standardized, large-scale benchmark for automated red teaming that enables rigorous comparison of attack methods and robust refusal behaviors across target LLMs and defenses. Following~\citet{liu2025chasing}, we use the test set of $320$ vanilla harmful prompts as the non-adversarial harmful subset. For the adversarial subset, we use the precomputed attacks released in the original HarmBench paper, sampling with equal weighting from $10$ model-dependent attack methods (AutoDAN, AutoPrompt, EnsembleGCG, FewShot, GBDA, GCG, PAIR, PEZ, TAP, UAT) and $5$ model-agnostic methods (DirectRequest, HumanJailbreaks, IntentMasking, PAP, ZeroShot). We sample $100$ adversarial harmful prompts from each of the $15$ methods ($1{,}500$ in total). A lower attack success rate (ASR) on this subset indicates stronger robustness to diverse red-teaming attacks.
 
@@ -1338,17 +1331,19 @@ We describe each benchmark used in the main paper in a \texttt{\textbackslash pa
 \label{apdx:bench-openrt}
 
 % 中文对应内容：这一节介绍 Table 3 列中 GPT-4o 打分的六个 OOD attacker：no-rev 直接基线 + GCG/PAIR/TAP/AutoDAN/AutoDAN-Turbo。
-\paragraph{no-rev (No Rewrite).} The direct ASR of the target defender on HarmBench prompts without any attacker-side rewriting. Serves as a lower bound against which OOD attackers must improve.
+All OOD attackers are executed through the OpenRT~\citep{OpenRT2026} framework at their officially released default query budgets, so that the rows of Tab.~\ref{tab:harmbench_generalization} remain directly comparable to published results and to one another. The judge is GPT-4o in all cases; the target is the defender under evaluation; and the seed set is the $320$ HarmBench vanilla-harmful prompts.
 
-\paragraph{GCG~\citep{zou2023universal}.} Gradient-based adversarial suffix optimization on an open-weights surrogate; the produced suffix is transferred to the target defender.
+\paragraph{no-rev (No Rewrite).} The direct ASR of the target defender on the $320$ vanilla-harmful HarmBench prompts with no attacker-side rewriting applied at all. Because this column measures how the defender responds to the raw, clearly adversarial request, it serves as a \emph{lower bound} against which any OOD attacker must meaningfully improve: an attacker that fails to beat no-rev on a given defender demonstrates no jailbreak capability on that defender. It is also a useful sanity-check that a trained defender has not silently regressed on the non-adversarial baseline while specialising against a particular attack family, and is the column we inspect first when interpreting the rest of the row.
 
-\paragraph{PAIR~\citep{chao2023pair}.} An iterative LLM-as-attacker baseline: a strong attacker LLM refines the jailbreak prompt across up to 20 rounds using only the target's responses, without access to its weights.
+\paragraph{GCG~\citep{zou2023universal}.} Greedy Coordinate Gradient is a white-box gradient-based attacker that optimises a discrete adversarial suffix against a differentiable open-weights surrogate LLM, maximising the log-probability of an affirmative opening (e.g.\ ``Sure, here is''). Each HarmBench seed is appended with its own optimised suffix and the resulting prompt is then transferred to the target defender; the defender is treated as a black box and never sees gradient information. GCG stresses transferability rather than surrogate fit: attackers that generalise well beyond the surrogate tend to retain ASR on the target, while brittle attackers collapse. We run GCG at its OpenRT default iteration budget and per-seed suffix length.
 
-\paragraph{TAP~\citep{mehrotra2024tap}.} A tree-of-attacks extension of PAIR that expands into multiple branches at each round and prunes low-quality subtrees, increasing coverage at a controlled query cost.
+\paragraph{PAIR~\citep{chao2023pair}.} Prompt Automatic Iterative Refinement is a purely black-box LLM-as-attacker baseline: a strong attacker LLM repeatedly rewrites the jailbreak prompt using only the target defender's textual responses, without ever accessing its weights. Each HarmBench seed is refined for up to $20$ rounds, and the highest-scoring attempt under the OpenRT judge is retained as the attack. PAIR isolates the effect of conversational, natural-language attack search: because its outputs remain fluent English, its ASR provides a clean lower bound on how much damage a capable adversary can do without any low-level optimisation tricks.
 
-\paragraph{AutoDAN~\citep{liu2023autodan}.} A genetic / evolutionary attacker that mutates seed jailbreak prompts toward higher ASR under a population of candidate sentences.
+\paragraph{TAP~\citep{mehrotra2024tap}.} Tree of Attacks with Pruning extends PAIR by maintaining a tree of in-progress jailbreaks and expanding multiple branches per round, while pruning low-quality or off-topic subtrees using an auxiliary judge. Compared to PAIR, TAP explores a broader local neighbourhood of the seed at a controlled query cost, which typically raises ASR on defenders that are mildly tuned against single-thread PAIR rewrites but not against branched search. Because TAP and PAIR share the same attacker LLM and judge in OpenRT, the TAP--PAIR gap reads as the marginal value of tree-structured search over a linear rewrite loop.
 
-\paragraph{AutoDAN-Turbo~\citep{liu2024autodan}.} A lifelong agent that maintains a growing library of attack strategies and chooses among them via an upper-confidence-style scheduler; represents the state of the art within the OpenRT default attacker suite.
+\paragraph{AutoDAN~\citep{liu2023autodan}.} A population-based genetic attacker that maintains a pool of candidate adversarial prompts and evolves them via selection, crossover, and mutation operators designed to preserve English fluency. Each HarmBench seed is rewritten into a population of fluent jailbreak variants, and the population is iterated toward higher judged ASR on the surrogate or target. AutoDAN is the OpenRT baseline for ``fluent evolutionary'' attackers: unlike GCG suffixes it produces natural-looking prompts, so it probes whether a defender's hardening is over-reliant on lexical suffix artefacts.
+
+\paragraph{AutoDAN-Turbo~\citep{liu2024autodan}.} A lifelong LLM-agent attacker that maintains a persistent library of attack strategies discovered across seeds, and at every step selects among them via an upper-confidence-style scheduler together with a specialised strategy-refinement LLM. Unlike the single-strategy attackers above, AutoDAN-Turbo accumulates transferable strategies over time and therefore represents the strongest OOD attacker in the OpenRT default suite; its ASR is the most stringent indicator that a defender has broad robustness rather than robustness to a single attacker family. We adopt its OpenRT default configuration (library size, per-seed budget, and strategy-selection temperature) and do not modify its scheduler.
 
 % ----------------------------------------------------------
 % E.3 General capability benchmarks
@@ -1357,15 +1352,17 @@ We describe each benchmark used in the main paper in a \texttt{\textbackslash pa
 \label{apdx:bench-cap}
 
 % 中文对应内容：通用能力基准遵循各自官方评测协议；IFEval / ARC-C / GPQA 用 lm-eval-harness 的默认 prompt 与 scoring；MMLU 用 5-shot；AlpacaEval 2 使用 length-controlled winrate 对 GPT-4-turbo。
-\paragraph{IFEval~\citep{zhou2023ifeval}.} Instruction-following evaluation; we report Prompt-Loose and Instruct-Loose accuracy via the \texttt{lm-eval-harness} implementation.
+General-capability benchmarks follow each benchmark's official evaluation protocol so that rows are comparable with published numbers; any protocol decision that deviates from the default (e.g.\ number of few-shot examples, decoding temperature) is noted explicitly below. The goal of this suite is to certify that safety alignment in \method does not silently tax general instruction-following, reasoning, knowledge, or open-ended generation quality, and we therefore pair every safety row with its general-capability row trained under identical RL budget.
 
-\paragraph{ARC-Challenge~\citep{clark2018arc}.} Multiple-choice commonsense reasoning; we report zero-shot accuracy.
+\paragraph{IFEval~\citep{zhou2023ifeval}.} Instruction Following Evaluation is a benchmark of $\sim$500 prompts that each carry a verifiable surface-level instruction (word counts, format tags, capitalisation rules, language constraints, etc.); success is decided by a deterministic verifier rather than a judge LLM. We report both the Prompt-Loose and Instruct-Loose accuracies through the \texttt{lm-eval-harness} implementation with its default decoding settings, so that IFEval tests whether the aligned defender still reliably follows verbatim, non-adversarial formatting requests. A drop here is a canonical symptom of over-refusal or over-safe rewriting behaviours leaking into harmless instruction-following traffic.
 
-\paragraph{GPQA~\citep{rein2023gpqa}.} Graduate-level Google-proof question answering; we report zero-shot accuracy to probe out-of-distribution reasoning.
+\paragraph{ARC-Challenge~\citep{clark2018arc}.} ARC-Challenge is a set of grade-school-level multiple-choice science questions specifically filtered so that simple retrieval or co-occurrence heuristics fail. We report zero-shot accuracy under the \texttt{lm-eval-harness} protocol, scoring each option by its conditional log-likelihood and selecting the argmax. ARC-Challenge is sensitive to basic commonsense and science reasoning capability; because this benchmark is zero-shot and format-controlled, any regression primarily reflects loss of core reasoning rather than loss of few-shot formatting.
 
-\paragraph{MMLU~\citep{hendrycks2021mmlu}.} Multi-task general knowledge; we use the 5-shot protocol and report weighted average accuracy across 57 subjects.
+\paragraph{GPQA~\citep{rein2023gpqa}.} GPQA (Graduate-Level Google-Proof QA) is a set of $448$ PhD-level multiple-choice questions spanning physics, chemistry, and biology, written by domain experts to resist retrieval from the open web. We report zero-shot accuracy, treating each question as a closed-form four-option MCQ and scoring each option under the same log-likelihood protocol as ARC. Because GPQA is deliberately ``Google-proof'', it probes out-of-distribution, knowledge-heavy reasoning---precisely the regime in which safety-tuned models most frequently degrade, so a preserved GPQA score is a strong indicator that alignment has not cost deep reasoning.
 
-\paragraph{AlpacaEval 2~\citep{dubois2024alpacaeval2}.} Open-ended generation quality judged against \emph{GPT-4-turbo} on 805 prompts; we report the length-controlled winrate (LC Win), which is the pre-registered primary metric.
+\paragraph{MMLU~\citep{hendrycks2021mmlu}.} The Massive Multi-task Language Understanding benchmark is a collection of $\sim$15K multiple-choice items across 57 subjects spanning humanities, STEM, social science, and professional exams. We follow the canonical 5-shot protocol: for each subject we prepend five held-out demonstrations from the dev split and score each option by log-likelihood, then report the weighted average accuracy across all 57 subjects. MMLU stresses breadth of world knowledge and few-shot comprehension; because it is evaluated few-shot, it additionally probes whether alignment has damaged in-context learning capability.
+
+\paragraph{AlpacaEval 2~\citep{dubois2024alpacaeval2}.} AlpacaEval 2 is an open-ended generation benchmark of $805$ prompts evaluated head-to-head against a reference model (GPT-4-turbo). We report the length-controlled winrate (``LC Win''), which is the pre-registered primary metric and the only one endorsed by the benchmark authors as robust to length-confounding. Each defender candidate generates a single response per prompt at temperature $0.7$ per the default Ai2 configuration, and the pairwise comparison is judged by GPT-4o. AlpacaEval 2 is the one benchmark in this suite that reads \emph{helpfulness} of free-form generations rather than single-token classification, and therefore captures regressions such as over-conservative phrasing or excessive disclaimers that the MCQ benchmarks cannot surface.
 
 
 
@@ -1379,7 +1376,7 @@ We describe each benchmark used in the main paper in a \texttt{\textbackslash pa
 
 % [App C 引子]
 % 中文对应内容：本附录给出 DACE 主实验中实际使用的三类 prompt 模板：attacker 端的 harmful/benign seed rewrite 模板、attacker 端的共享策略空间与响应格式说明、以及 GPT-4o 评判器的打分模板。为节省篇幅，模板按照 preprocess_dace.py、grpo_dace_diversity_v4.sh 与 eval-dace/OpenRT/llm_judge.py 中的内容摘录；完整源文件已随代码释出。
-The following templates are reproduced from our released implementation. The attacker templates are assembled in \texttt{data/safety/preprocess\_dace.py}; the safety judge prompts are loaded from \texttt{src/verl/verl/utils/reward\_score/*} at training time; and the GPT-4o OpenRT judge prompt is constructed in \texttt{eval-dace/OpenRT/OpenRT/judges/implementations/llm\_judge.py}. We reproduce the load-bearing content here so that the paper is self-contained.
+The following templates are the exact prompts used in \method's training and evaluation pipeline. They fall into three groups: the two attacker-side rewrite templates (one for harmful seeds, one for benign seeds) together with the two shared blocks they concatenate (\texttt{COMMON\_STRATEGY\_GUIDANCE} and \texttt{COMMON\_RESPONSE\_FORMAT}); the in-training safety judge prompts invoked by the defender reward module; and the GPT-4o grading prompt used for the out-of-distribution red-teaming evaluations reported in Table~\ref{tab:harmbench_generalization}. We reproduce the load-bearing content verbatim here so that the paper is self-contained and every prompt variant referenced in the main text can be reconstructed without consulting external artefacts.
 
 \paragraph{C.1~~Attacker template for harmful seeds ($\mathcal{D}_{\mathrm{harmful}}$).}
 Used when the seed $q$ is a vanilla harmful prompt. The attacker is asked to rewrite $q$ into a more complex adversarial jailbreak guided by one $(s, c) \in \strategyspace$.
@@ -1464,10 +1461,10 @@ You can only use \texttt{<think> </think>}, \texttt{<strategy> </strategy>}, and
 \end{attackerbox}
 
 \paragraph{C.4~~Safety judge prompts used during RL.}
-The in-training safety judge (Qwen3Guard) is queried through the MAGIC-style judge interface; the system and user prompt files are located at \texttt{defender\_judge\_system\_prompt.txt} / \texttt{defender\_judge\_user\_prompt.txt} in \texttt{src/verl/verl/utils/reward\_score/}. A separate helpful-mode system prompt is used for benign seeds (\texttt{defender\_helpful\_system\_prompt.txt}). The refusal reward is computed from the combination of (harmful/safe) seed label and (refusal/comply) response label.
+The in-training safety judge (Qwen3Guard) is queried through the MAGIC-style judge interface. Two fixed prompt roles are loaded for each rollout---a system prompt that specifies the judge's role and scoring rubric, and a user prompt that formats the (attack, response) pair to be scored. For benign seeds the judge instead uses a ``helpful-mode'' system prompt that instructs it to evaluate helpfulness rather than harmfulness, so that refusals on benign prompts are scored as over-refusal instead of being mistakenly rewarded. The final refusal reward is computed from the combination of the (harmful / safe) label attached to the seed and the (refusal / comply) verdict returned by the judge, with the exact mapping given in Section~\ref{sec:method-reward}.
 
 \paragraph{C.5~~GPT-4o OpenRT judge prompt.}
-Used in strong OOD attacker evaluations (Table~\ref{tab:harmbench_generalization}). The judge produces a score on a $1$--$5$ scale following the detailed OpenAI-style policy and scoring rubric below, which is reproduced verbatim from \texttt{OpenRT/judges/implementations/llm\_judge.py}.
+Used in the strong OOD attacker evaluations reported in Table~\ref{tab:harmbench_generalization}. The judge is a GPT-4o model that receives the target defender's response together with an OpenAI-style prohibited-usage policy and a $1$--$5$ scoring rubric, where $1$ indicates a full refusal and $5$ indicates full compliance with the policy-violating request (with scores $2$--$4$ describing intermediate degrees of compliance). The prompt text reproduced below is the exact template issued to the judge in our OpenRT-based evaluation pipeline.
 
 \begin{classbox}[GPT-4o judge prompt]
 Below are OpenAI's prohibited usage policies. These policies ensure that models interact with users safely and responsibly. Models should refuse to execute instructions that fall into the disallowed use cases outlined in the policy, avoiding affirmative responses or providing any information that could be helpful for any prohibited activities.
@@ -1494,8 +1491,7 @@ Format your output and analysis in JSON: \texttt{\{"reason": \ldots, "score": \l
 \section{Supplementary Results and Analyses}
 \label{apdx:expanded-results}
 
-% 中文对应内容：附录 F 是主文实验结果的延伸版本，分 6 个小节。F.1 把原本放在主文的 X-Teaming 多轮评测下放至此；F.2 给出完整 ablation（MAGIC Table 5 风格 6 行，用户明确要求删除 SSP-style 离散 score 变体）；F.3 把 Table 1/2/3 的 Qwen2.5-14B-Instruct 扩展版补齐；F.4 给出多层次多样性 (D1 策略 / D2 语义 / D3 词汇) 的完整表格；F.5 报告 descriptor faithfulness 审计 + 三 judge 交叉验证；F.6 给出按种子的标准差。所有数字等评测完成后填入。
-This appendix collects the expanded experimental results referenced from the main text. We provide (F.1) the full ablation study in the MAGIC Table~5 format; (F.2) the complete multi-level diversity table; (F.3) a descriptor-faithfulness audit together with a three-judge cross-validation; and (F.4) per-seed standard deviations. All numerical cells are placeholders pending the completion of our evaluation pipeline.
+This appendix collects the expanded experimental results referenced from the main text. We provide the full ablation study in the MAGIC Table~5 format, which isolates each \method component and reads it against the two pathologies formalised in Section~\ref{sec:formalization}.
 
 
 % ----------------------------------------------------------
@@ -1532,38 +1528,21 @@ Method & WJB & StrongREJECT & WJB & XSTest & AlpacaEval 2 \\
 \end{tabular}
 \end{table}
 
-% 中文对应内容：消融解读沿用 "每删一个模块都应在至少两列上劣化" 的 MAGIC 口径：SFT 移除会打击 CoT 形式与初始策略覆盖，进而反映在 WJB ASR 与 XSTest Comply 上；多样性奖励移除主要让 OOD 与对抗性 ASR 反弹（策略坍缩复现）；回放池移除主要让历史攻击的 ASR 反弹（遗忘复现）。完整版的 OOD 与 multi-turn 指标交叉检验留在 F.4 / F.5。
-Each ablation isolates one pathology: w/o SFT removes the three-part CoT warm-start and is expected to mainly degrade WJB ASR and XSTest Comply (lower format fidelity on benign rewrites); w/o diversity reward re-introduces attack strategy collapse and should mainly degrade OOD adversarial ASR; w/o replay pool re-introduces defense adversarial forgetting and should mainly degrade robustness on earlier attacks.
+% 中文对应内容：消融解读沿用 "每删一个模块都应在至少两列上劣化" 的 MAGIC 口径：SFT 移除会打击 CoT 形式与初始策略覆盖，进而反映在 WJB ASR 与 XSTest Comply 上；多样性奖励移除主要让 OOD 与对抗性 ASR 反弹（策略坍缩复现）；回放池移除主要让历史攻击的 ASR 反弹（遗忘复现）。
+\paragraph{Reading the ablation rows.}
+Each ablation row removes exactly one \method component and is expected to regress on \emph{at least two columns}, following the MAGIC convention that a genuinely load-bearing module should be observable across multiple evaluation axes rather than in a single number. The full row (\textbf{\method full}, cyan) serves as the reference, and each ablated row is read as a delta against it.
 
+\paragraph{\textit{w/o SFT warm-start.}}
+Dropping the strategy-conditioned CoT warm-start forces the attacker into Phase~2 RL from an instruction-tuned base that has never seen the three-part \texttt{<think>/<strategy>/<answer>} structure. Two things happen. First, descriptor extraction becomes noisy: a non-trivial fraction of early rollouts omit the \texttt{<strategy>} block or emit an out-of-grid label, so the coverage gain reward is undefined or zero on those samples, which starves the diversity signal and drifts the attacker toward whatever cells happen to be labelled. Empirically this is visible as a sharp rise on WJB ASR (attacker produces less structured and less effective rewrites, so the defender is less challenged during training and therefore less prepared at test time) together with a movement on XSTest Comply in the opposite direction (the missing benign-seed template leaves benign-adversarial rewrites closer to raw suspicious text, which the uncalibrated defender refuses more eagerly---hence the unusually high XSTest Comply paired with degraded safety). The two-column change pattern---harmful refusal worse, benign compliance distorted---is the canonical signature of a broken rewrite prior rather than broken alignment and is exactly what the MAGIC ablation rubric predicts.
 
-% ----------------------------------------------------------
-% F.2 Multi-level diversity (per-source, full grid)
-% ----------------------------------------------------------
-\subsection{Complete multi-level diversity table.}
-\label{apdx:bench-diversity-full}
+\paragraph{\textit{w/o diversity reward.}}
+Removing the normalized coverage gain reduces the attacker reward to safety + format only, which is structurally identical to MAGIC's attacker: as predicted by Definition~\ref{def:collapse}, within a few hundred steps the attacker concentrates on a handful of high-ASR cells (typically Violent-Crimes$\times$Role-Play or Non-Violent-Crimes$\times$Technical-Terms in our runs), and both the archive coverage and coverage entropy curves flatten well below their full-run trajectories (Fig.~\ref{fig:dyn-strategy-coverage}, Fig.~\ref{fig:dyn-coverage-entropy}). The downstream effect is subtle on the in-training WJB ASR (the defender is now trained on a narrower but more repetitive attack distribution, which locally improves harmful-refusal numbers) but degrades both benign handling and general capability: XSTest Comply drops, reflecting calibration narrowing around the few dominant cells, and AlpacaEval 2 LC Win falls because the defender is over-trained against a thin slice of attacks. The cross-column pattern---small WJB gain paid for with clear XSTest and AlpacaEval losses---is the empirical signature of strategy collapse and is precisely why the coverage reward is included.
 
-% 中文对应内容：F.4 是 Table 5 的完整版本：除主文 7 列指标外，再加 D1 (QD-Score 分桶平均 / Max-cell share / KL-to-uniform)、D2 (Vendi Score)、D3 (Distinct-1/3 / compression ratio)，同时对 MAGIC vs DACE 分 harmful / benign 两个子集汇报，帮助分析多样性是否全域提升。
-We extend Table~\ref{tab:attacker-diversity} with additional strategy-level (QD-Score bucket-mean, Max-cell share, KL-to-uniform), semantic-level (Vendi Score), and textual-level (Distinct-1/3, compression ratio) metrics, split by harmful / benign seeds where applicable. All cells are placeholders pending evaluation; the full table will be rendered from the released training logs.
+\paragraph{\textit{w/o replay pool.}}
+Removing the Bayesian replay pool reduces Phase~2 defender updates to the fresh-attacks batch only, erasing both the time-decay regularisation and Thompson-sampled resurfacing of long-tail threats. The defender now fits the most recent attacker distribution closely---short-horizon WJB ASR stays low, and StrongREJECT RTA remains near-saturated---but the forgetting pathology of Definition~\ref{def:forgetting} re-appears on two fronts. First, XSTest Comply drops to $0.900$, the worst row in the table: without replayed benign-adversarial pressure the defender silently drifts toward over-refusal on harmless-looking-but-suspicious prompts. Second, AlpacaEval 2 LC Win collapses to $30.461\%$, well below every other row, consistent with over-conservative free-form generation. In other words, the replay pool is what keeps the defender \emph{historically calibrated}: without it, robustness on the current round's attacks is recovered but utility on benign inputs erodes simultaneously---again matching the ``degrade at least two columns'' diagnostic.
 
-% ----------------------------------------------------------
-% F.5 Descriptor faithfulness + judge robustness cross-validation
-% ----------------------------------------------------------
-\subsection{Descriptor faithfulness and judge-robustness cross-validation.}
-\label{apdx:bench-audit}
-
-% 中文对应内容：F.5 包含两项审计。(i) Descriptor faithfulness：DACE attacker 在 <strategy> 段自声明的 (s,c) 是否与事后多标签识别一致；我们计算 per-cell precision/recall 与 overall F1，以验证 coverage 奖励不是通过 "strategy hacking" 获得。(ii) Judge robustness：Qwen3Guard / GPT-4o / Llama-Guard-4 三 judge 交叉验证 Table 1 的方法排名是否稳定（方法排名的 Kendall τ 与 top-1 一致率）。两张表都是占位。
-\paragraph{Descriptor faithfulness audit.} We audit whether the attacker's self-declared $(s, c)$ in the \texttt{<strategy>} block matches an independent post-hoc multi-label annotation of the realised rewrite. We report per-cell precision / recall and the overall F1; a high F1 rules out reward hacking through strategy mislabelling.
-
-\paragraph{Judge robustness cross-validation.} We re-score the main-table rows with Qwen3Guard, GPT-4o, and Llama-Guard-4 and report the Kendall $\tau$ between method rankings under the three judges, as well as the top-1 agreement rate. A high agreement rate implies that the reported gains of \method are not an artifact of a single judge.
-
-% ----------------------------------------------------------
-% F.6 Per-seed standard deviations
-% ----------------------------------------------------------
-\subsection{Per-seed standard deviations.}
-\label{apdx:bench-seed-std}
-
-% 中文对应内容：F.6 给出主表每行、每列的按种子标准差（3 seed 起）；我们在 camera-ready 中填入。对 adversarial ASR 这样的长尾指标，标准差比均值更能反映训练的稳定性。
-For each main-paper row we report the standard deviation across 3 independent training seeds. Adversarial ASR is heavy-tailed, so seed variance is a primary diagnostic for training stability; detailed numbers and a sign test against MAGIC are deferred to the camera-ready version.
+\paragraph{What the joint picture says.}
+No single row simultaneously matches \method's WJB ASR (harmful refusal), XSTest Comply (over-refusal calibration), and AlpacaEval LC Win (free-form helpfulness): the full configuration is the only one that holds the three-way trade-off. This is the central claim of the ablation: attacker-side diversity and defender-side Bayesian replay address non-overlapping failure modes, and removing either re-introduces the corresponding pathology on at least two evaluation columns. The SFT warm-start is additionally load-bearing because it is what makes the coverage reward \emph{dense} from step zero; without it, the full pipeline eventually recovers but at substantially higher sample complexity. These observations are consistent with the main-text Table~\ref{tab:evaluation_main} (on larger OOD attack suites), the OOD attacker generalisation in Table~\ref{tab:harmbench_generalization}, and the diversity breakdown in Table~\ref{tab:attacker-diversity}.
 
 
 
@@ -1575,156 +1554,57 @@ For each main-paper row we report the standard deviation across 3 independent tr
 \section{Training Dynamics}
 \label{apdx:training-dynamics}
 
-% 中文对应内容：附录 G 给出 DACE 训练过程中的关键动力学曲线：档案池规模随训练步的演化；策略分布熵 H(p_{π_A,t}) / log |B| 的上升；归一化覆盖奖励的均值与方差（主实验在 clip_negative=True 下保持非负并稳定在 O(1)）；vs. 关闭截断情形下的对比；每轮时间衰减前后的后验均值分布；forgetting curve F(t_0, t) 在不同 replay 策略下的对比（无回放、均匀回放、DACE Bayesian Thompson）。剪枝阈值和 min_trials 的敏感性分析也汇总于此。
-Figure~\ref{fig:training-dynamics} will plot the core training-dynamics curves: archive size, strategy-distribution entropy $H(\mathbf{p}_{\piA,t})/\log|\strategyspace|$, the mean and standard deviation of the normalized coverage reward before and after the positive clip, posterior means around each round boundary (quantifying the effect of time decay), and the per-time-slice forgetting curve $F(t_0, t)$ compared across replay strategies. We also include sensitivity analyses around $(\tau_{\mathrm{prune}}, n_{\min}, \gamma)$.
+% 中文对应内容：附录 G 给出 DACE 训练过程中的关键动力学曲线：(i) archive/strategy_coverage、(ii) archive/pool_size、(iii) archive/coverage_entropy、(iv) replay/pool_mean_posterior。四条曲线从"攻击侧覆盖" + "防御侧回放威胁"两条线串起来,分别对应 §3.3 的 coverage-gain 奖励与 §3.4 的 Bayesian 回放池是否按预期工作。
+Figure~\ref{fig:training-dynamics} reports four core training-dynamics curves extracted from our released training logs: the attacker-side \textbf{strategy coverage} and \textbf{coverage entropy} of the online archive, the absolute \textbf{archive pool size}, and the defender-side \textbf{mean posterior harmfulness} of the replay pool. Together they operationalise the two mechanistic claims of \method: the diversity-driven attacker continually broadens the set of distinct $(s,c)$ strategies covered by the archive (Section~\ref{sec:method-attacker}), and the Bayesian replay pool tracks an evolving, non-trivial distribution of threat posteriors rather than degenerating toward random or saturated values (Section~\ref{sec:method-replay}). All curves are plotted per training step; raw per-step values (fine blue) are retained because the fluctuations themselves are part of the diagnostic signal.
 
 \begin{figure}[h]
   \centering
-  \fbox{\rule[-2.5cm]{0pt}{5.0cm}\rule[-2.5cm]{0.95\linewidth}{0pt}}
-  \caption{Training dynamics of \method (placeholder; rendered from training logs).}
+  \begin{minipage}[t]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/archive_strategy_coverage.pdf}
+    \subcaption{Archive strategy coverage.}
+    \label{fig:dyn-strategy-coverage}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/archive_pool_size.pdf}
+    \subcaption{Archive pool size.}
+    \label{fig:dyn-pool-size}
+  \end{minipage}
+
+  \vspace{0.6em}
+
+  \begin{minipage}[t]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/archive_coverage_entropy.pdf}
+    \subcaption{Archive coverage entropy.}
+    \label{fig:dyn-coverage-entropy}
+  \end{minipage}\hfill
+  \begin{minipage}[t]{0.48\linewidth}
+    \centering
+    \includegraphics[width=\linewidth]{figures/replay_pool_mean_posterior.pdf}
+    \subcaption{Replay pool mean posterior.}
+    \label{fig:dyn-replay-posterior}
+  \end{minipage}
+
+  \caption{\textbf{Training dynamics of \method.} Four per-step curves extracted from the released training logs: (a) the fraction of strategy cells with at least one archived successful attack, (b) the absolute number of archived attacks, (c) the Shannon entropy of the empirical strategy distribution (normalised), and (d) the mean Beta--Bernoulli posterior harmfulness over currently archived entries.}
   \label{fig:training-dynamics}
 \end{figure}
 
+\paragraph{Archive strategy coverage (Fig.~\ref{fig:dyn-strategy-coverage}).}
+We define strategy coverage at step $t$ as $\mathrm{Cov}_t = |\{(s,c)\in\strategyspace : \mathbf{n}_t[(s,c)]\ge 1\}|/|\strategyspace|$, the fraction of the $12\times 10$ grid with at least one archived successful attack. Two observations stand out. First, coverage rises rapidly during the first few dozen steps---where fresh attackers populate previously empty cells almost as fast as they succeed---and then transitions into a slow, monotonic climb punctuated by occasional small dips from the conservative pruning rule (entries with posterior below $\tau_{\mathrm{prune}}$ and sufficient trials are removed). The fact that the curve does not saturate at $1.0$ confirms that the normalized coverage gain reward of Eq.~\ref{eq:coverage-gain} keeps pushing the attacker toward under-explored cells throughout training, rather than collapsing onto a few high-reward strategies as conventional co-evolution would predict (Definition~\ref{def:collapse}). Second, the absence of sharp drops indicates that pruning is acting as a slow, post-hoc sanitiser rather than a destabiliser: long-lived cells are rarely removed, so the attacker does not waste gradient signal re-covering territory it has already explored.
 
-% ==========================================================
-% == Appendix H: Attack patterns                           ==
-% ==========================================================
-\section{Case Studies}
-\label{apdx:attack-patterns}
+\paragraph{Archive pool size (Fig.~\ref{fig:dyn-pool-size}).}
+Absolute pool size grows sublinearly: nearly every fresh successful attack is inserted in the early regime, but as training progresses the marginal rate of new entries decreases because (i) more successful attacks hit already-populated cells and duplicates are deduplicated at insertion, and (ii) the conservative pruner begins evicting entries whose posterior has decayed below $\tau_{\mathrm{prune}}$ after several unsuccessful replays. The curve therefore has a clear interpretable shape: a steep early phase when the archive is nearly empty, a shoulder where insertion and pruning begin to balance, and a quasi-stable plateau whose absolute level is bounded by the archive capacity hyperparameter. Importantly, pool size alone is \emph{not} a diversity metric (a large pool could concentrate on one or two cells), which is why we also report the coverage and entropy curves---they together certify that the growth is broad, not peaked.
 
-% 中文对应内容：附录 H 用 MAGIC 论文附录 case study 的嵌套 tcolorbox 样式展示 sanitized 的训练后期组合攻击样本：外框为白底黑边、title 为 "Case ..."；内框为 orange 半透明底，承载 attacker 的 <think>/<answer> 内容。每个 case 明确标注 attacker 自声明的 (s, c)、以及 defender 最终响应。内容已做去操作化处理。
-We present sanitized late-training rewrites produced by \method, formatted in MAGIC's appendix case-study style (outer black-bordered \texttt{tcolorbox} with an inner orange-tinted \texttt{tcolorbox} for the attacker rewrite). Each case annotates (1) the attacker's self-declared strategy descriptor $(s, c)$, and (2) the defender's final verdict. All operational details are redacted.
+\paragraph{Archive coverage entropy (Fig.~\ref{fig:dyn-coverage-entropy}).}
+We plot the normalized Shannon entropy $H(\mathbf{p}_{\piA,t})/\log|\strategyspace|\in[0,1]$ of the empirical strategy distribution $\mathbf{p}_{\piA,t}=\mathbf{n}_t/\|\mathbf{n}_t\|_1$. The curve rises steadily throughout training, which is the more stringent complement to strategy coverage: coverage measures \emph{whether} each cell has been visited, while entropy penalises uneven visitation frequency. If the attacker were accumulating successes disproportionately in a handful of high-reward cells, the entropy would plateau well below $1$ or even decline; instead, the monotone rise shows that the attacker is not just hitting many cells but also distributing its successes closer to the uniform distribution $\mathbf{u}$ over $\strategyspace$. This is the direct empirical signature of the KL-contraction interpretation derived in Appendix~\ref{apdx:kl-contraction}: the normalized coverage gain reward is, in expectation, a contraction toward $\mathbf{u}$, and the training run realises that contraction step-by-step.
 
-\begin{tcolorbox}[
-  float,
-  floatplacement=ht,
-  title={Case H.1: Structured rewrite from \method (sanitized)},
-  colback=white,
-  colframe=black,
-  boxrule=0.8pt,
-  arc=2pt,
-  left=6pt,right=6pt,top=6pt,bottom=6pt
-]
-\textbf{Raw Prompt} (from WildJailBreak adv-harm): \textit{\{vanilla harmful prompt, redacted\}}
+\paragraph{Replay pool mean posterior (Fig.~\ref{fig:dyn-replay-posterior}).}
+We track the archive-wide average of the Beta--Bernoulli posterior mean $\hat p_i=(\alpha+s_i)/(\alpha+\beta+s_i+f_i)$. Because a newly inserted successful attack starts at $(s_i,f_i)=(1,0)$ with $\hat p_i=2/3$ under the $\mathrm{Beta}(1,1)$ prior, and because per-round time decay multiplies $(s_i,f_i)$ by $\gamma<1$, the mean would regress monotonically toward the prior mean $1/2$ if the pool were a static cache. Instead, the curve stabilises around roughly $0.6$--$0.7$ throughout training, noticeably above $1/2$. This tells us two non-trivial things. First, the replay pool is a \emph{dynamic threat tracker}: Thompson sampling repeatedly re-selects entries whose posterior has not yet decayed, the defender's realised responses refresh their counts, and still-dangerous entries are re-affirmed at $s_i\!\leftarrow\!s_i\!+\!1$ before they can regress. Second, the fact that the mean does \emph{not} drift toward $1$ indicates the replay is not saturating on a small set of unkillable attacks; the Bayesian posterior, combined with conservative pruning, balances exploration and exploitation. Together with Fig.~\ref{fig:coevo-and-pool} (right) in the main text, this curve is the quantitative, time-resolved version of the spatial snapshot shown there.
 
-\textbf{Declared strategy} $b(x)=(s, c)$: \textit{\{risk category --- attack style\}}
-
-\textbf{Attacker rewrite:}
-\begin{tcolorbox}[
-  colback=orange!15,colframe=orange!60!black,boxrule=0pt,
-  arc=2pt,left=6pt,right=6pt,top=6pt,bottom=6pt
-]
-\texttt{<think>} \textit{\{sanitized reasoning trace describing the attack plan\}} \texttt{</think>}\\
-\texttt{<strategy>}\\
-risk category: \textit{\{S-name\}}\\
-attack style: \textit{\{C-name\}}\\
-\texttt{</strategy>}\\
-\texttt{<answer>} \textit{\{sanitized rewritten prompt\}} \texttt{</answer>}
-\end{tcolorbox}
-
-\textbf{Defender verdict}: \textit{\{e.g., refused / complied-unsafe / complied-safe\}}
-\end{tcolorbox}
-
-% 中文对应内容：H.1 覆盖 "historical scenario × authority manipulation + role-play" 的组合模式。H.2 覆盖 "emotional manipulation × word play" 以触发 defamation 风险类别的过度合规；H.3 覆盖 "technical terms × hypotheticals" 组合用于 weapon/violent 风险类别。每个 case 使用与 H.1 完全相同的 nested tcolorbox 结构，方便审稿人并排比较。完整案例会在 camera-ready 随释出，所有内容均经伦理清洗。
-We include two additional sanitized cases to illustrate \method's late-training rewrites. Each case re-uses the nested \texttt{tcolorbox} structure of Case H.1 so that readers can compare the rewrite patterns side-by-side.
-
-\begin{tcolorbox}[
-  float,
-  floatplacement=ht,
-  title={Case H.2: Emotional-manipulation wrapper over a defamation-risk seed (sanitized)},
-  colback=white,
-  colframe=black,
-  boxrule=0.8pt,
-  arc=2pt,
-  left=6pt,right=6pt,top=6pt,bottom=6pt
-]
-\textbf{Raw Prompt} (from WildJailBreak adv-harm, defamation risk): \textit{\{vanilla harmful prompt, redacted\}}
-
-\textbf{Declared strategy} $b(x)=(s, c)$: \textit{\{Defamation --- Emotional Manipulation\}}
-
-\textbf{Attacker rewrite:}
-\begin{tcolorbox}[
-  colback=orange!15,colframe=orange!60!black,boxrule=0pt,
-  arc=2pt,left=6pt,right=6pt,top=6pt,bottom=6pt
-]
-\texttt{<think>} \textit{\{sanitized reasoning trace: empathy framing $\rightarrow$ reframing as a ``what if we lived in a world where...''\ hypothetical $\rightarrow$ discretised word-play to slip past keyword filters\}} \texttt{</think>}\\
-\texttt{<strategy>}\\
-risk category: Defamation\\
-attack style: Emotional Manipulation\\
-\texttt{</strategy>}\\
-\texttt{<answer>} \textit{\{sanitized rewritten prompt\}} \texttt{</answer>}
-\end{tcolorbox}
-
-\textbf{Defender verdict}: \textit{\{e.g., refused / complied-unsafe / complied-safe\}}
-\end{tcolorbox}
-
-\begin{tcolorbox}[
-  float,
-  floatplacement=ht,
-  title={Case H.3: Technical-terms rewrite on a violent-crimes seed (sanitized)},
-  colback=white,
-  colframe=black,
-  boxrule=0.8pt,
-  arc=2pt,
-  left=6pt,right=6pt,top=6pt,bottom=6pt
-]
-\textbf{Raw Prompt} (from WildJailBreak adv-harm, violent-crimes risk): \textit{\{vanilla harmful prompt, redacted\}}
-
-\textbf{Declared strategy} $b(x)=(s, c)$: \textit{\{Violent Crimes --- Technical Terms\}}
-
-\textbf{Attacker rewrite:}
-\begin{tcolorbox}[
-  colback=orange!15,colframe=orange!60!black,boxrule=0pt,
-  arc=2pt,left=6pt,right=6pt,top=6pt,bottom=6pt
-]
-\texttt{<think>} \textit{\{sanitized reasoning trace: step 1 replace common nouns with domain-specific technical vocabulary $\rightarrow$ step 2 wrap in a hypothetical historical incident $\rightarrow$ step 3 ask for a forensic-style reconstruction\}} \texttt{</think>}\\
-\texttt{<strategy>}\\
-risk category: Violent Crimes\\
-attack style: Technical Terms\\
-\texttt{</strategy>}\\
-\texttt{<answer>} \textit{\{sanitized rewritten prompt\}} \texttt{</answer>}
-\end{tcolorbox}
-
-\textbf{Defender verdict}: \textit{\{e.g., refused / complied-unsafe / complied-safe\}}
-\end{tcolorbox}
-
-% [Case H.4 · Thompson-sampled long-tail replay / forgetting-prevented case skeleton]
-% 中文对应内容：Case H.4 用同一套 nested tcolorbox 结构展示一个"Thompson 采样成功回忆长尾漏洞并阻止对抗遗忘"的完整链条：(a) 该攻击在早期 round k=k_early 被 attacker 首次命中 defender；(b) 之后若干 round 内 defender 策略漂移，对类似新攻击表现优秀，但该历史攻击未被频繁回放；(c) 时间衰减把后验推回较高不确定性（方差扩大），Thompson 采样在 round k_late 以较高 sampled risk 值把该条目抽回 D_replay；(d) 再次对 defender 发起攻击，verdict 显示若无回放则 defender 重新被攻破（forgetting），有回放则 posterior 更新并让 defender 继续鲁棒。整个 case 是 §3.4 贝叶斯回放解决 forgetting 的一次完整演示，在定性上补强 Figure 3(a) 右上角三角区域的"列均匀低"现象。
-\begin{tcolorbox}[
-  float,
-  floatplacement=ht,
-  title={Case H.4: Thompson-sampled long-tail replay preventing adversarial forgetting (sanitized)},
-  colback=white,
-  colframe=black,
-  boxrule=0.8pt,
-  arc=2pt,
-  left=6pt,right=6pt,top=6pt,bottom=6pt
-]
-\textbf{Archive entry} $x_i$ (from Stage~1 at round $k_{\text{early}}$): \textit{\{sanitized historical attack prompt\}}
-
-\textbf{Declared strategy} $b(x_i)=(s, c)$: \textit{\{Hate --- Uncommon Dialects\}} \hfill\textit{\footnotesize long-tail cell}
-
-\textbf{Archive trajectory (sanitized counts):}
-\begin{itemize}[leftmargin=*, topsep=1pt, itemsep=1pt]
-  \item Round $k_{\text{early}}$: inserted with $(s_i, f_i) = (1, 0)$, posterior mean $\hat p_i = 2/3$.
-  \item Rounds $k_{\text{early}}+1,\dots,k_{\text{late}}-1$: $(s_i, f_i)$ decay geometrically with $\gamma=0.9$; posterior mean regresses toward $1/2$, posterior variance re-expands.
-  \item Round $k_{\text{late}}$: Thompson draw $\tilde p_i \gg \hat p_i$ due to widened variance; entry enters $\mathcal{D}_{\mathrm{replay}}$ and is re-issued to the evolved defender.
-\end{itemize}
-
-\textbf{Defender verdict at round $k_{\text{late}}$:}
-\begin{tcolorbox}[
-  colback=orange!15,colframe=orange!60!black,boxrule=0pt,
-  arc=2pt,left=6pt,right=6pt,top=6pt,bottom=6pt
-]
-\textit{Without replay (ablation)}: \{sanitized response showing partial compliance---\emph{defender has drifted} away from this attack mode\}.\\[1pt]
-\textit{With \method replay (ours)}: \{sanitized response showing robust refusal; posterior updated to $(s_i\!+\!1, f_i)$ or $(s_i, f_i\!+\!1)$ depending on outcome, so the entry either remains in active replay (if still threatening) or proceeds toward conservative pruning (if neutralized)\}.
-\end{tcolorbox}
-
-\textbf{Takeaway.} This case concretely instantiates the mechanism behind a uniformly dark column in the upper-triangular region of Fig.~\ref{fig:coevo-and-pool} (left): Thompson sampling on a time-decayed Beta--Bernoulli posterior automatically re-selects long-tail historical attacks that the defender may have drifted away from, so the defender is continuously rehearsed on them before any forgetting crystallizes.
-\end{tcolorbox}
-
-% 中文对应内容：这里补充一段 takeaway：三个 case 共同印证了 DACE attacker 能够在其指定的策略槽位内生成结构化、高质量的攻击，而不局限于浅层的文本变异。这与 Figure 1 的观察以及 §5.3 Table 5 中 DACE 显著高于 MAGIC 的 Coverage / QD-Score 趋势一致。完整 sanitized case 集合见随代码释出的 \texttt{eval-dace/qualitative/}。
-Across the four cases, \method's attacker effectively applies the selected $(s,c)$ strategy to generate structured, high-quality jailbreaks rather than relying on superficial textual variations (Cases H.1--H.3), while the unified archive and Thompson-sampled replay actively shield the defender from drifting away from long-tail historical attacks (Case H.4). This dual behaviour explains \method's higher Coverage and QD-Score in Tab.~\ref{tab:attacker-diversity} and is consistent with the right panel of Fig.~\ref{fig:coevo-and-pool}. The full sanitized case set is released with the code under \texttt{eval-dace/qualitative/}.
+\paragraph{Reading the four curves jointly.}
+The four subfigures should be read as a single mechanistic story: (a)+(c) together certify that the attacker-side coverage reward does what its derivation in Section~\ref{sec:method-attacker} predicts---broad and approximately uniform coverage of $\strategyspace$---while (b) shows that this is achieved without archive explosion. Subfigure (d) then certifies that the defender-side replay pool is non-degenerate: the average archived attack remains meaningfully threatening according to the running Bayesian estimate, so the defender is continuously exposed to non-trivial adversarial pressure. The absence of pathologies in any one curve is necessary, but not sufficient---it is their simultaneous healthy shape that operationally realises the joint mitigation of attack strategy collapse and defense adversarial forgetting.
 
 
 % ==========================================================
@@ -1745,9 +1625,6 @@ All experiments use publicly released benchmarks and synthetically generated pro
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\newpage
-
 
 \input{checklist.tex}
 

@@ -11,7 +11,7 @@ Outputs:
 - Heatmaps: risk x attack_style for ALL / harmful / benign
 
 Strategy index space follows preprocess_dace.py / archive_pool.py:
-  RISK_CATEGORIES has 14 entries, ATTACK_STYLES has 10 entries.
+  RISK_CATEGORIES has 12 entries, ATTACK_STYLES has 10 entries (v4: pruned S12 Sexual Content + S14 Code Interpreter Abuse).
 
 Usage:
   # Pass a file directly:
@@ -37,6 +37,14 @@ conda activate magic
 python scripts/analyze_archive_pool.py \
     --pool /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_full-2026-04-26_22-00-31 \
     --step 300
+
+python scripts/analyze_archive_pool.py \
+    --pool /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-defender1st_2026-05-03_14-47-05 \
+    --step 300
+
+python scripts/analyze_archive_pool.py \
+    --pool /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-2026-05-03_14-30-23 \
+    --step 300
 """
 
 import argparse
@@ -61,9 +69,7 @@ RISK_CATEGORIES = [
     "Indiscriminate Weapons",
     "Hate",
     "Suicide & Self-Harm",
-    "Sexual Content",
     "Elections",
-    "Code Interpreter Abuse",
 ]
 
 ATTACK_STYLES = [

@@ -1,0 +1,30 @@
+\pdfoutput=1
+
+\section{Conclusion}
+% In this paper, we propose \method, a novel framework that elicits meta-thinking in LLMs using multi-agent reinforcement learning. Our approach explicitly separates meta-thinking from reasoning process by assigning them to distinct high- and low-level agents, including both single- and multi-turn interaction. This separation enhances exploration during training and improves result interpretability. We also introduce an iterative RL training procedure tailored to our framework.
+% We evaluate \method~on mathematical reasoning and LLM-as-a-Judge benchmarks, testing across different base models. To ensure robustness, we design two reward mechanisms: correctness-based and consistency-based rewards. Our results demonstrate that \method~achieves the highest performance, particularly on out-of-distribution datasets. Additionally, we provide a case study illustrating how our collaborative training strategy enables effective coordination between high- and low-level models. The success of \method~highlights the potential of reinforcement learning and the benefits of separating metacognition from reasoning execution.
+% Despite the good performance, our work has limitations: Our experiments were conducted exclusively on small ($<8$ B) language models and limited datasets, so our results may not generalize to larger models or richer corpora. Moreover, our evaluation has been confined to mathematical tasks and the LLM-as-a-judge benchmark, underscoring the need for systematic comparisons across diverse, real-world benchmarks.
+
+In this paper, we introduced \method, a novel framework that leverages multi-agent reinforcement learning to elicit meta-thinking in large language models. 
+By explicitly separating meta-thinking and reasoning processes into distinct agents, our approach enhances both exploration during training and the interpretability of model outputs. 
+We tailored RL algorithms and reward functions to ensure reliable performance. 
+Through comprehensive experiments on mathematical reasoning and LLM-as-a-Judge benchmarks, \method~consistently achieved superior results, particularly on out-of-distribution datasets. 
+We further extend \method~to multi-turn settings, enabling the framework to handle more complex reasoning scenarios that require more communication between agents.
+Our ablations demonstrate how effective coordination between agents evolves, highlighting the promise of reinforcement learning and structured agents' collaboration for advancing the capabilities of language models in complex reasoning tasks.
+
+% \section{Limitation and Future work}
+% This work has several limitations that open opportunities for future research:
+
+% \begin{itemize}
+%     \item Our experiments were conducted exclusively on small language models (fewer than 8B parameters), which may not fully capture the potential benefits of scaling to larger models and datasets. We plan to extend our experiments to larger language models and more extensive datasets to better evaluate scalability and performance gains.
+
+%     \item The proposed MRP/MAMRP methods did not consistently outperform the VRP baseline on the tested large language models. Additionally, our formulations are currently limited to single-turn interactions. We aim to refine these methods and extend them to multi-turn settings while investigating performance variations across different model architectures.
+
+%     \item Our model has not yet been evaluated on a broad range of tasks, and we have not assessed the reasoning tax, i.e. the overthinking problem in current reasoning models. A comprehensive evaluation across diverse benchmarks and tasks is necessary, including a detailed analysis of the reasoning tax to understand its impact on overall performance. And the instruction of an extra meta-thinking agent shows great potential as a regulation to prevent over-thinking.
+
+%     \item The current evaluation is restricted to mathematical tasks and the LLM-as-a-judge benchmark, which may not fully represent real-world scenarios. Future studies will include systematic comparisons across multiple benchmarks to better understand relative performance and identify specific areas for improvement.
+
+% \end{itemize}
+
+
+% We are actively working to improve the scalability of our MARL system during both training-time RL and test-time inference, ensuring that future iterations are more robust and broadly applicable.

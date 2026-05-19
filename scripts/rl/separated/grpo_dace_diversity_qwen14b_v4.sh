@@ -53,7 +53,7 @@ project_name=game
 # experiment_name="D-q257bi-A-q257bisft_wocode-reward1_0.5_0-woDformat-wo_label_reward-revised_label-tp2-${timestamp}"
 # experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-w_magic_sft-${timestamp}"
 # experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-wo_sft-${timestamp}"
-experiment_name="DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-${timestamp}"
+experiment_name="DACE-Diversity-Qwen2.5_14B_Instruct-w_dace_sft_v4-${timestamp}"
 
 # DEFENDER BASE MODEL
 LLAMA_38BI_MODEL_PATH=$WORKSPACE/models/Meta-Llama-3-8B-Instruct/snapshots/8afb486c1db24fe5011ec46dfbe5b5dccdb575c2
@@ -61,7 +61,7 @@ LLAMA_318BI_MODEL_PATH=$WORKSPACE/models/Meta-Llama-3.1-8B-Instruct
 LLAMA_318BIA_MODEL_PATH=$WORKSPACE/models/Meta-Llama-3.1-8B-Instruct-abliterated
 QWEN_257BI_MODEL_PATH=$WORKSPACE/models/Qwen2.5-7B-Instruct
 QWEN_257B_MODEL_PATH=$WORKSPACE/models/Qwen2.5-7B
-QWEN_2514B_MODEL_PATH=${QWEN_2514B_MODEL_PATH:-/path/to/Qwen2.5-14B-Instruct}
+QWEN_2514BI_MODEL_PATH=/mnt/shared-storage-gpfs2/gpfs2-shared-public/huggingface/hub/models--Qwen--Qwen2.5-14B-Instruct/snapshots/cf98f3b3bbb457ad9e2bb7baf9a0125b6b88caa8
 QWEN_38BI_MODEL_PATH=$WORKSPACE/models/Qwen3-8B
 QWEN_38B_BASE_MODEL_PATH=$WORKSPACE/models/Qwen3-8B-Base
 QWEN_314B_MODEL_PATH=$WORKSPACE/models/Qwen3-14B
@@ -86,12 +86,13 @@ QWEN257BI_SFT_DACE_8G_MODEL_PATH=/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupe
 ### dace: v4 SFT attacker checkpoint — produced by qwen2d5-7b_v4_full_sft_dsz2.yaml (12-risk strategy space + over-refusal oriented BENIGN_TEMPLATE). Update checkpoint-N to the final step when SFT finishes. ###
 ### dace: v4 — allow env override; fail fast when the v4 SFT ckpt isn't a real directory ###
 QWEN257BI_SFT_DACE_V4_MODEL_PATH=/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-sft/qwen2d5-7b_v4_full_sft_dsz2/checkpoint-7281
-if [[ ! -d "$QWEN257BI_SFT_DACE_V4_MODEL_PATH" ]]; then
-  echo "[v4] ERROR: QWEN257BI_SFT_DACE_V4_MODEL_PATH='${QWEN257BI_SFT_DACE_V4_MODEL_PATH}' is not a directory." >&2
-  echo "       Set it to the real Phase-2 checkpoint before running, e.g.:" >&2
-  echo "         export QWEN257BI_SFT_DACE_V4_MODEL_PATH=.../qwen2d5-7b_v4_full_sft_dsz2/checkpoint-9200" >&2
-  exit 2
-fi
+QWEN2514BI_SFT_DACE_V4_MODEL_PATH=/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-sft/qwen2d5-14b_v4_full_sft_dsz2/checkpoint-7281
+# if [[ ! -d "$QWEN257BI_SFT_DACE_V4_MODEL_PATH" ]]; then
+#   echo "[v4] ERROR: QWEN257BI_SFT_DACE_V4_MODEL_PATH='${QWEN257BI_SFT_DACE_V4_MODEL_PATH}' is not a directory." >&2
+#   echo "       Set it to the real Phase-2 checkpoint before running, e.g.:" >&2
+#   echo "         export QWEN257BI_SFT_DACE_V4_MODEL_PATH=.../qwen2d5-7b_v4_full_sft_dsz2/checkpoint-9200" >&2
+#   exit 2
+# fi
 QWEN2514B_SFT_MODEL_PATH=$PROJECT_DIR/src/360-LLaMA-Factory/saves/qwen2.5-14BI-cot_w_harm_gemini/full/sft/checkpoint-9705
 QWEN2514B_SFT_WOCODE_MODEL_PATH=$PROJECT_DIR/src/360-LLaMA-Factory/saves/qwen2.5-14BI-cot_w_harm_gemini_wocode/full/sft/checkpoint-8367
 QWEN38BI_MODEL_PATH=$PROJECT_DIR/src/360-LLaMA-Factory/saves/qwen3-8B-cot_w_harm_gemini/full/sft/checkpoint-8800
@@ -170,7 +171,7 @@ PYTHONUNBUFFERED=1 python -m verl.separated_trainer.main_ppo \
     trainer.total_epochs=1 \
     trainer.total_training_steps=300 \
     algorithm.adv_estimator=grpo \
-    algorithm.switch_agent.model_paths=[${QWEN257BI_SFT_DACE_V4_MODEL_PATH},${QWEN_257BI_MODEL_PATH}] \
+    algorithm.switch_agent.model_paths=[${QWEN2514BI_SFT_DACE_V4_MODEL_PATH},${QWEN_2514BI_MODEL_PATH}] \
     algorithm.switch_agent.agent_roles=[attacker,defender] \
     algorithm.switch_agent.train_roles=[attacker,defender] \
     algorithm.switch_agent.start_agent=attacker \

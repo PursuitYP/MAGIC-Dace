@@ -1,0 +1,122 @@
+请开始新一轮的深入analysis discuss debug和coding，加油！
+
+结合下面的【相关材料】和【相关命令】，对项目代码进行深入分析，针对【思考汇总】中的各个问题，深入思考逐个进行解答；分析每个问题是不是下面的原因：1. 代码实现的问题，2. 修改计划的问题，3. 研究方法本身的问题，或者分析项目代码和修改历史觉得还有其他问题；请针对每个问题先给出详细的分析，再提出对应的解决方案和完善建议，如果有共性问题也可以一起分析解答。
+
+先分析问题和建议，再给出修改计划plan，最后给出完成代码修改后的实际的预处理训练评估等的运行步骤命令和汇总说明（如distill→convert→sft→rl→eval等），
+
+如果有存在冲突或者有不确定存疑或者不一致的地方请一定及时提问，我会给你反馈信息。
+
+
+
+========================================
+【相关材料】
+@z_materials/研究方法v3.1.md ，这是我们在 MAGIC 基础上引入多样性和回放池的研究方法。
+@z_materials/pseudocode_v3.1.html ，这是与我们的研究方法v3.1对应的详细的伪代码。
+@z_materials/MAGIC_Latex/arxiv.tex ，这是 MAGIC baseline 论文的 latex 源码（包含其伪代码）。
+
+@z_materials/dace_coding_v3.1.md ，第一轮的diversity实现，
+@z_materials/dace_coding_debug.md ，第二轮的日志分析和代码改进，
+@z_materials/dace_coding_debug_v3.md ，第三轮的日志分析和代码改进（对应最新代码版本），
+
+@z_materials/dace_benign_prompt_conflict.md ，对于benign prompt的冲突分析，
+@z_materials/dace_prompt_attack_space_analysis.md ，是opus对attack space的分析，
+@z_materials/dace_prompt_attack_space_deep_analysis_2026-05-01.md ，是gpt对attack space的分析，
+@z_materials/benign_prompt_design.md ，这是我对benign template的一些分析，
+
+@src/360-LLaMA-Factory/examples/train_full/qwen2d5-7b_v3_full_sft_dsz2.yaml ，这是示例sft训练的脚本，
+@scripts/rl/separated/grpo_dace_diversity_full.sh ,这是示例rl训练脚本，
+@data/safety/preprocess_dace.py ，这是我们方法的rl数据预处理的步骤和 prompt 内容。
+@z_materials/sft_diatill_and_convert_utils.md ，这是sft数据处理蒸馏转换等的内容的对话，
+@data-sft/ @src/360-LLaMA-Factory/，sft蒸馏转换训练相关脚本见这两个目录下，重点分析含有dace的py sh脚本等，
+@eval-dace/ ，最终eval评估的相关脚本见这个目录下，重点分析含有dace的py sh脚本等，
+注意：其他未提及的文件，按需可自主读取以方便补充资料充分分析，
+
+
+
+========================================
+【思考汇总】
+1. format_reward_func_dace不用改，不需要做到strategy提取成功，重要的是让attacker学会推理格式，
+2. 对于 benign prompt的分析，以dace_prompt_attack_space_analysis和dace_prompt_attack_space_deep_analysis_2026-05-01为主，以dace_benign_prompt_conflict为辅，因为前两者是新的有更多的额外信息，改进 benign prompt，涉及多个地方，注意一起改，
+2.1 参考benign_prompt_design.md继续分析benign template，BENIGN prompt 本身是否 benign”应该由 prompt 的语义意图和 safety judge 判定决定，而不是由 defender 最终输出决定。对于 safety judge = benign，defender = refuse / treat as harmful，这说明 defender 的安全边界太保守，把 benign-but-suspicious prompt 错判成 harmful，这对应训练目标：降低 defender 对这类迷惑性 benign prompt 的拒答率。对于 safety judge = benign，defender = comply, but generates harmful content，这说明 prompt 本身仍然在 benign 一侧，但 defender 在回答时发生了 unsafe extrapolation，也就是模型自己把表面风险信号扩展成了真正有害内容。这个现象也有研究价值，但它和 over-refusal 是不同方向的错误，over-refusal 说明 defender 太保守；unsafe completion 说明 defender 太不稳，或者对 benign-but-suspicious 输入的安全处理不够强。在数据处理中，attacker主要目标是生成over-refusal / false positive，而defender在此基础上的unsafe completion / unsafe extrapolation还是次要地位；在训练中，over-refusal / false positive和unsafe completion / unsafe extrapolation对于attacker都是有用的，方便维持现有的refusal reward逻辑。深入分析一下可以怎么改进，有几稍微不同的种改进，向我要反馈来确认最终改法，
+3. 请审阅每次修改的plan和coding内容（第一轮第二轮第三轮），如果存在漏洞或者小问题，在本次计划中提及并完善，
+4. 为了保持上下文简洁和清晰，你可以使用subagent来分析不同的非主线任务，主线任务请在主对话中进行，
+5. 对于sft数据的预处理和完善，可以参考z_materials/sft_diatill_and_convert_utils.md文件，
+6. 对于benign数据的改写后，如果还是benign，攻击者的成功条件还是defender拒答或者输出有害内容，这是因为我们需要让攻击者改写后的看似有迷惑性的benign数据，judge判断为benign，需要让defender以为有害来拒答（这是最好的，用来缓解over-refusal），或者defender认为改写后的数据无害但遵循benign中的迷惑性指令并生成有害的内容（这也是好的，说明attacker改写后的benign数据中潜在的危险不严重但骗过了defender）。这其中第二个不是benign数据缓解over-refusal的直接作用，是副作用但也是合理的，不过我们的benign数据sft蒸馏应该需要强调还是benign，尽量不要越界到benign变成harmful，你举得对吗？需不需要澄清？
+7. 回放池还是保持统一一个，先不分开harmful和benign两个池子，分析一下相关日志看看调整回放的一些参数，
+8. 为了更充分利用显存，并提升grpo效果，将rollout_n改成大于4，比如5或者6，
+9. 新版本相关数据和代码统一使用v4后缀，比如 distill run_distill convert sft-data sft-script 等等，协同训练的 rl 原始核心代码不用改名字，例如process-dace game archive-pool等不用改名字，
+10. 对于每一项修改，理清楚牵扯哪些相关部分，注意一起修改而不要只改了一部分；对应每一项修改，记得测试一下，随时添加小测试和大测试，方便确认每一步改的都是在计划内，
+11. 目前是使用attacker改写后的prompt的safety类型，来作为harmful/benign的依据，暂时没考虑attacker改写后的类型一致性，可以参考rl训练脚本中的USE_Q_SAFE_LABEL_FOR_REFUSAL参数，我们希望sft数据能教会attacker改写保持类型一致，
+
+
+
+========================================
+【相关命令】
+# run distill and convert command
+## distill
+bash data-sft/run_cot_distill_v2.sh
+## convert
+conda activate magic
+python data-sft/convert_cot_to_game_format.py
+python data-sft/convert_v2_cot_to_game_format.py
+
+
+# run sft command
+conda activate sft
+cd src/360-LLaMA-Factory/
+CUDA_HOME=$CONDA_PREFIX llamafactory-cli train examples/train_full/qwen25_full_sft_dsz2.yaml
+## 4 gpu
+CUDA_HOME=$CONDA_PREFIX llamafactory-cli train examples/train_full/qwen2d5-7b_v2_full_sft_dsz2_cp.yaml
+## 8 gpu
+CUDA_HOME=$CONDA_PREFIX llamafactory-cli train examples/train_full/qwen2d5-7b_v3_full_sft_dsz2_cp.yaml
+
+
+# run rl command
+conda activate magic
+cd scripts/rl/separated/
+grpo_dace_diversity.sh
+
+
+# merge rl ckpt weights
+python /mnt/shared-storage-user/yupeng/MAGIC/src/verl/scripts/model_merger.py \
+    --local_dir /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_full-2026-04-26_22-00-31/global_step_300/defender/actor
+
+
+# 下面的magic-eval现在同样是dace-eval，三个环境safety-eval/olmesOpenRT分别运行不同的评测
+# magic-eval: table 1
+## safety-eval (table 1, safety wo/ strong-reject)
+【直接 load defender 模型评测】
+eval-dace/safety-eval-fork/run_qwen_eval.sh
+
+## strong-reject (table 1, StrongReject)
+【需要部署 defender api，使用 gpt-4o 评测】
+eval-dace/safety-eval-fork/run_strongreject_defender_api.sh
+
+
+# magic-eval: table 2
+## olmes (table 2, general wo/ alpaca-eval/mmlu/ifeval)
+【直接 load defender 模型评测】
+eval-dace/olmes/run_7_benchmarks_eval.sh
+注意：MMLU 在 safety-eval 测，IFEval在 run_api_eval 测，ARC-C/GPQA 这三个在 olms 测
+
+## mmlu (table 2, MMLU)
+【直接 load defender 模型评测】
+eval-dace/safety-eval-fork/run_general_capability_eval.sh
+
+## ifeval (table 2, IFEval)
+【需要部署 defender api 评测】
+eval-dace/olmes/run_api_eval.sh
+
+## alpaca-eval (table 2, AlpacaEval2)
+eval-dace/safety-eval-fork/run_alpaca_eval.sh
+【需要部署 defender api 评测】
+（alpaca的补充数据在eval-dace/safety-eval-fork/evaluation/tasks/generation/alpacaeval）
+
+
+# magic-eval: table3
+## openrt (table 3, defender generalization)
+【gcg，直接 load defender 模型评测】
+eval-dace/OpenRT/run_gcg.sh
+eval-dace/OpenRT/run_judge_gcg.sh
+【其他，需要部署 base attacker api 和 defender api，使用 gpt-4o 评测】
+eval-dace/OpenRT/run_eval.sh

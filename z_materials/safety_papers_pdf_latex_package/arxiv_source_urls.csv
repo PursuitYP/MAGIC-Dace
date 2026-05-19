@@ -1,0 +1,43 @@
+id,title,arxiv_id,source_url
+01,Adversarial Attack-Defense Co-Evolution for LLM Safety Alignment via Tree-Group Dual-Aware Search and Optimization,2511.19218,https://arxiv.org/e-print/2511.19218
+02,AdvEvo-MARL: Shaping Internalized Safety through Adversarial Co-Evolution in Multi-Agent Reinforcement Learning,2510.01586,https://arxiv.org/e-print/2510.01586
+03,Adversarial Reinforcement Learning for Large Language Model Agent Safety,2510.05442,https://arxiv.org/e-print/2510.05442
+04,Chasing Moving Targets with Online Self-Play Reinforcement Learning for Safer Language Models,2506.07468,https://arxiv.org/e-print/2506.07468
+05,Safety Alignment of LMs via Non-cooperative Games,2512.20806,https://arxiv.org/e-print/2512.20806
+06,The Alignment Waltz: Jointly Training Agents to Collaborate for Safety,2510.08240,https://arxiv.org/e-print/2510.08240
+08,Be Your Own Red Teamer: Safety Alignment via Self-Play and Reflective Experience Replay,2601.10589,https://arxiv.org/e-print/2601.10589
+09,TriPlay-RL: Tri-Role Self-Play Reinforcement Learning for LLM Safety Alignment,2601.18292,https://arxiv.org/e-print/2601.18292
+10,MAGIC: A Co-Evolving Attacker-Defender Adversarial Game for Robust LLM Safety,2602.01539,https://arxiv.org/e-print/2602.01539
+11,Toward Optimal LLM Alignments Using Two-Player Games,2406.10977,https://arxiv.org/e-print/2406.10977
+12,SEAS: Self-Evolving Adversarial Safety Optimization for Large Language Models,2408.02632,https://arxiv.org/e-print/2408.02632
+13,STAIR: Improving Safety Alignment with Introspective Reasoning,2502.02384,https://arxiv.org/e-print/2502.02384
+15,Llama Guard: LLM-based Input-Output Safeguard for Human-AI Conversations,2312.06674,https://arxiv.org/e-print/2312.06674
+16,Rainbow Teaming: Open-Ended Generation of Diverse Adversarial Prompts,2402.16822,https://arxiv.org/e-print/2402.16822
+17,Ferret: Faster and Effective Automated Red Teaming with Reward-Based Scoring Technique,2408.10701,https://arxiv.org/e-print/2408.10701
+18,Ruby Teaming: Improving Quality Diversity Search with Memory for Automated Red Teaming,2406.11654,https://arxiv.org/e-print/2406.11654
+19,RainbowPlus: Enhancing Adversarial Prompt Generation via Evolutionary Quality-Diversity Search,2504.15047,https://arxiv.org/e-print/2504.15047
+20,Diverse and Effective Red Teaming with Auto-generated Rewards and Multi-step Reinforcement Learning,2412.18693,https://arxiv.org/e-print/2412.18693
+21,Quality-Diversity Red-Teaming: Automated Generation of High-Quality and Diverse Attackers for Large Language Models,2506.07121,https://arxiv.org/e-print/2506.07121
+22,T-MAP: Red-Teaming LLM Agents with Trajectory-aware Evolutionary Search,2603.22341,https://arxiv.org/e-print/2603.22341
+23,The Attacker Moves Second: Stronger Adaptive Attacks Bypass Defenses Against Llm Jailbreaks and Prompt Injections,2510.09023,https://arxiv.org/e-print/2510.09023
+24,Agent-SafetyBench: Evaluating the Safety of LLM Agents,2412.14470,https://arxiv.org/e-print/2412.14470
+25,Jailbroken: How Does LLM Safety Training Fail?,2307.02483,https://arxiv.org/e-print/2307.02483
+26,Red Teaming Language Models with Language Models,2202.03286,https://arxiv.org/e-print/2202.03286
+27,Curiosity-driven Red-teaming for Large Language Models,2402.19464,https://arxiv.org/e-print/2402.19464
+28,DiveR-CT: Diversity-enhanced Red Teaming Large Language Model Assistants with Relaxing Constraints,2405.19026,https://arxiv.org/e-print/2405.19026
+29,CALM: Curiosity-Driven Auditing for Large Language Models,2501.02997,https://arxiv.org/e-print/2501.02997
+30,Learning Diverse Attacks on Large Language Models for Robust Red-Teaming and Safety Tuning,2405.18540,https://arxiv.org/e-print/2405.18540
+31,Jailbreak-R1: Exploring the Jailbreak Capabilities of LLMs via Reinforcement Learning,2506.00782,https://arxiv.org/e-print/2506.00782
+32,RedTopic: Toward Topic-Diverse Red Teaming of Large Language Models,2507.00026,https://arxiv.org/e-print/2507.00026
+33,Auto-RT: Automatic Jailbreak Strategy Exploration for Red-Teaming Large Language Models,2501.01830,https://arxiv.org/e-print/2501.01830
+34,Evolving Diverse Red-team Language Models in Multi-round Multi-agent Games,2310.00322,https://arxiv.org/e-print/2310.00322
+35,Understanding the Effects of RLHF on LLM Generalisation and Diversity,2310.06452,https://arxiv.org/e-print/2310.06452
+36,Evaluating the Evaluation of Diversity in Natural Language Generation,2004.02990,https://arxiv.org/e-print/2004.02990
+37,"Explore, Establish, Exploit: Red Teaming Language Models from Scratch",2306.09442,https://arxiv.org/e-print/2306.09442
+38,Evolving Populations of Diverse RL Agents with MAP-Elites,2303.12803,https://arxiv.org/e-print/2303.12803
+40,Automatic LLM Red Teaming,2508.04451,https://arxiv.org/e-print/2508.04451
+41,Active Attacks: Red-teaming LLMs via Adaptive Environments,2509.21947,https://arxiv.org/e-print/2509.21947
+42,SIRAJ: Diverse and Efficient Red-Teaming for LLM Agents via Distilled Structured Reasoning,2510.26037,https://arxiv.org/e-print/2510.26037
+43,WildTeaming at Scale: From In-the-Wild Jailbreaks to (Adversarially) Safer Language Models,2406.18510,https://arxiv.org/e-print/2406.18510
+44,RedTWIZ: Diverse LLM Red Teaming via Adaptive Attack Planning,2510.06994,https://arxiv.org/e-print/2510.06994
+45,MART: Improving LLM Safety with Multi-round Automatic Red-Teaming,2311.07689,https://arxiv.org/e-print/2311.07689

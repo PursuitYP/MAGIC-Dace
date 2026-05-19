@@ -24,7 +24,8 @@ export OPENAI_MODEL="gpt-4o"
 
 # 任务和结果配置
 # MODEL_NAME="CoT-s165"  # 使用defender_api标识
-MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
+# MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
+MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
 
 TASKS="strongreject"  # 使用完整数据集（313个样本），如需测试可用"strongreject:small"（60个样本）
 # RESULTS_DIR="./results/rebuttal/$MODEL_NAME/$TASKS/-$(date +%Y%m%d_%H%M%S)"

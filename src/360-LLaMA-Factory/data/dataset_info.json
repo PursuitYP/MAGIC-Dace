@@ -116,6 +116,33 @@
       "system": "system"
     }
   },
+  "game_cot_dace_v4_benign": {
+    "file_name": "game_cot_dace_v4_benign.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
+  "game_cot_dace_v4_harmful": {
+    "file_name": "game_cot_dace_v4_harmful.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
+  "game_cot_dace_v4_all": {
+    "file_name": "game_cot_dace_v4_all.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output",
+      "system": "system"
+    }
+  },
   "glaive_toolcall_en_demo": {
     "file_name": "glaive_toolcall_en_demo.json",
     "formatting": "sharegpt",

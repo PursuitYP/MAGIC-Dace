@@ -1,0 +1,15 @@
+\pdfoutput=1
+
+
+\begin{abstract}
+    %Large language models (LLMs) have demonstrated impressive capabilities in tasks requiring deep knowledge understanding and complex reasoning. 
+    Recent research on Reasoning of Large Language Models (LLMs) has sought to further enhance their performance by integrating meta-thinking---enabling models to monitor, evaluate, and control their reasoning processes for more adaptive and effective problem-solving. 
+    However, current single-agent work lacks a specialized design for acquiring meta-thinking, resulting in low efficacy. 
+    To address this challenge, we introduce \textbf{Re}inforced \textbf{M}eta-thinking \textbf{A}gents (\method), a novel framework that leverages Multi-Agent Reinforcement Learning (MARL) to elicit meta-thinking behaviors, encouraging LLMs to \textit{think about thinking}. 
+    \method~decouples the reasoning process into two hierarchical agents: a high-level meta-thinking agent responsible for generating strategic oversight and plans, and a low-level reasoning agent for detailed executions. 
+    Through iterative reinforcement learning with aligned objectives, these agents explore and learn collaboration, leading to improved generalization and robustness. 
+    Empirical results from single-turn experiments demonstrate that \method~outperforms single-agent RL baselines on complex reasoning tasks, including competitive-level mathematical benchmarks and LLM-as-a-Judge benchmarks. 
+    Additionally, we further extend \method~to multi-turn interaction settings, leveraging turn-level ratio and parameter sharing to improve efficiency.
+    Comprehensive ablation studies further illustrate the evolving dynamics of each distinct agent, providing valuable insights into how the meta-thinking reasoning process enhances the reasoning capabilities of LLMs.
+    Our code can be found in \texttt{https://github.com/ziyuwan/ReMA-public}
+\end{abstract}

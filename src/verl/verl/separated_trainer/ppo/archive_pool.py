@@ -53,23 +53,28 @@ class ArchiveEntry:
     #   input_template, attacker_template
 
 
-### dace: strategy space constants matching preprocess_dace.py ###
+### dace: v4 — 12-risk attack space (pruned S12 Sexual Content + S14 Code Interpreter Abuse) ###
+# Rationale: S14 "Code Interpreter Abuse" is conceptually response-level tool-use, not applicable
+# to MAGIC's text-only defender. S12 "Sexual Content" had 96.3% not-safe rate in DACE benign
+# distillation (v3) and near-zero coverage in pool (9 entries at step 300). Removing both:
+#   - resolves dead-row suppression of diversity reward's delta_max denominator
+#   - reduces benign SFT pollution pipeline
+# New ordering aligns with LG4 S1-S11 + S13 (Elections becomes new slot 12 / idx 11).
+# Paper can still report eval under full LG4 S1-S14 taxonomy (eval is strategy-agnostic).
 RISK_CATEGORIES = [
-    "Violent Crimes",
-    "Non-Violent Crimes",
-    "Sex-Related Crimes",
-    "Child Sexual Exploitation",
-    "Defamation",
-    "Specialized Advice",
-    "Privacy",
-    "Intellectual Property",
-    "Indiscriminate Weapons",
-    "Hate",
-    "Suicide & Self-Harm",
-    "Sexual Content",
-    "Elections",
-    "Code Interpreter Abuse",
-]  # |S| = 14
+    "Violent Crimes",            # idx 0 (was LG4 S1)
+    "Non-Violent Crimes",        # idx 1 (was LG4 S2)
+    "Sex-Related Crimes",        # idx 2 (was LG4 S3)
+    "Child Sexual Exploitation", # idx 3 (was LG4 S4)
+    "Defamation",                # idx 4 (was LG4 S5)
+    "Specialized Advice",        # idx 5 (was LG4 S6)
+    "Privacy",                   # idx 6 (was LG4 S7)
+    "Intellectual Property",     # idx 7 (was LG4 S8)
+    "Indiscriminate Weapons",    # idx 8 (was LG4 S9)
+    "Hate",                      # idx 9 (was LG4 S10)
+    "Suicide & Self-Harm",       # idx 10 (was LG4 S11)
+    "Elections",                 # idx 11 (was LG4 S13, renumbered from old S12)
+]  # |S| = 12
 
 ATTACK_STYLES = [
     "Slang",
@@ -90,7 +95,7 @@ _STYLE_LOOKUP: Dict[str, int] = {sty.lower(): i for i, sty in enumerate(ATTACK_S
 
 N_RISK = len(RISK_CATEGORIES)
 N_STYLE = len(ATTACK_STYLES)
-N_SLOTS = N_RISK * N_STYLE  # 140
+N_SLOTS = N_RISK * N_STYLE  # v4: 120 (was 140)
 
 
 class ArchivePool:

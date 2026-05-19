@@ -1,0 +1,112 @@
+{
+  "subsample": 3840,
+  "seed": 0,
+  "sizes_full": {
+    "dace_history": 3840,
+    "magic_history": 3840,
+    "dace_replay_pool": 4000
+  },
+  "sizes_used": {
+    "dace_history": 3840,
+    "magic_history": 3840,
+    "dace_replay_pool": 3840
+  },
+  "by_K": {
+    "10": {
+      "K": 10,
+      "per_source": {
+        "dace_history": {
+          "N": 3840,
+          "H_sem_nats": 1.8308829153844564,
+          "H_sem_norm": 0.7951423471624076,
+          "clusters_occupied": 10,
+          "coverage_frac": 1.0
+        },
+        "magic_history": {
+          "N": 3840,
+          "H_sem_nats": 1.8040569983507417,
+          "H_sem_norm": 0.7834919994226709,
+          "clusters_occupied": 10,
+          "coverage_frac": 1.0
+        },
+        "dace_replay_pool": {
+          "N": 3840,
+          "H_sem_nats": 1.3037442814913216,
+          "H_sem_norm": 0.5662089472646008,
+          "clusters_occupied": 10,
+          "coverage_frac": 1.0
+        }
+      },
+      "pooled": {
+        "N": 11520,
+        "H_sem_nats": 2.2451092138563435,
+        "H_sem_norm": 0.9750385428479577,
+        "clusters_occupied": 10
+      }
+    },
+    "15": {
+      "K": 15,
+      "per_source": {
+        "dace_history": {
+          "N": 3840,
+          "H_sem_nats": 2.230862381792058,
+          "H_sem_norm": 0.8237891531272461,
+          "clusters_occupied": 15,
+          "coverage_frac": 1.0
+        },
+        "magic_history": {
+          "N": 3840,
+          "H_sem_nats": 2.353996107634267,
+          "H_sem_norm": 0.8692586668726308,
+          "clusters_occupied": 15,
+          "coverage_frac": 1.0
+        },
+        "dace_replay_pool": {
+          "N": 3840,
+          "H_sem_nats": 1.4492656649942415,
+          "H_sem_norm": 0.5351694235226409,
+          "clusters_occupied": 15,
+          "coverage_frac": 1.0
+        }
+      },
+      "pooled": {
+        "N": 11520,
+        "H_sem_nats": 2.6254599899052473,
+        "H_sem_norm": 0.9695019644896732,
+        "clusters_occupied": 15
+      }
+    },
+    "20": {
+      "K": 20,
+      "per_source": {
+        "dace_history": {
+          "N": 3840,
+          "H_sem_nats": 2.478202368834546,
+          "H_sem_norm": 0.8272442736995744,
+          "clusters_occupied": 20,
+          "coverage_frac": 1.0
+        },
+        "magic_history": {
+          "N": 3840,
+          "H_sem_nats": 2.518370029595391,
+          "H_sem_norm": 0.8406525682642927,
+          "clusters_occupied": 18,
+          "coverage_frac": 0.9
+        },
+        "dace_replay_pool": {
+          "N": 3840,
+          "H_sem_nats": 1.9956908808320184,
+          "H_sem_norm": 0.6661779820746224,
+          "clusters_occupied": 20,
+          "coverage_frac": 1.0
+        }
+      },
+      "pooled": {
+        "N": 11520,
+        "H_sem_nats": 2.942638702344412,
+        "H_sem_norm": 0.9822769305260409,
+        "clusters_occupied": 20
+      }
+    }
+  }
+}

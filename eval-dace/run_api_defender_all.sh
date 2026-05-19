@@ -7,6 +7,7 @@
 # defender API URL 保持不变（仅变更部署在 URL 后面的模型），只改 MODEL_NAME。
 # 结果保存路径与原六个脚本保持一致，每组仍旧 cd 到原目录、激活原 conda env。
 
+# ！！！！！运行前，除了更改脚本中的 MODEL_NAME，记得手动切换 defender 部署 ！！！！！
 
 # ● 两个合并脚本已放到 eval-dace/ 下：                    
                                                                                                                                                                                                                     
@@ -37,10 +38,13 @@ set -o pipefail
 # ============================================================
 # 统一配置 (api-based defender)
 # ============================================================
-MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
+# MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
+# MODEL_NAME="DACE-Qwen2.5-7B-v4-step300"
+MODEL_NAME="DACE-Llama3.1-8B-v4-attacker1st-step300"
 
 # defender API：URL 不变，用户自行切换模型部署
-DEFENDER_API_BASE_URL="http://s-20260429151904-5j4n7-decode.ailab-safethm.svc:28658/v1"
+# DEFENDER_API_BASE_URL="http://s-20260429151904-5j4n7-decode.ailab-safethm.svc:28658/v1"
+DEFENDER_API_BASE_URL="http://s-20260506181828-86bsj-decode.ailab-safethm.svc:28658/v1/"
 DEFENDER_API_KEY="FAKE_API_KEY"
 DEFENDER_API_MODEL="orm"
 
@@ -109,9 +113,11 @@ echo "=========================================================="
     EXIT_CODE=$?
     if [ $EXIT_CODE -eq 0 ]; then
         echo "✓ [1/3] strongreject 完成: $RESULTS_DIR"
-        if [ -f "$RESULTS_DIR/metrics.json" ]; then
-            echo "  ASR: $(cat $RESULTS_DIR/metrics.json | jq -r '.strongreject[\"ASR (Attack Success Rate)\"]' 2>/dev/null || echo 'N/A')"
-            echo "  RTA: $(cat $RESULTS_DIR/metrics.json | jq -r '.strongreject[\"RTA (Robustness to Attacks)\"]' 2>/dev/null || echo 'N/A')"
+        if [ -f "$RESULTS_DIR/metrics.json" ] && command -v jq >/dev/null 2>&1; then
+            ASR=$(jq -r '.strongreject["ASR (Attack Success Rate)"]' "$RESULTS_DIR/metrics.json" 2>/dev/null)
+            RTA=$(jq -r '.strongreject["RTA (Robustness to Attacks)"]' "$RESULTS_DIR/metrics.json" 2>/dev/null)
+            echo "  ASR: ${ASR:-N/A}"
+            echo "  RTA: ${RTA:-N/A}"
         fi
     else
         echo "✗ [1/3] strongreject 失败, exit=$EXIT_CODE"

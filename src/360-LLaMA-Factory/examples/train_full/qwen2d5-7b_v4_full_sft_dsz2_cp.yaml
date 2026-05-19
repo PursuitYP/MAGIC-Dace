@@ -1,3 +1,7 @@
+### dace: v4_cp — NOTE: this is a legacy v3 stub named "v4_cp", NOT the real v4 training config.
+### It currently points to game_cot_dace_v1nv2_v3_* (v3 data) with num_train_epochs=30 and output dir suffix "_cp".
+### For real v4 training, use src/360-LLaMA-Factory/examples/train_full/qwen2d5-7b_v4_full_sft_dsz2.yaml instead.
+### TODO: either migrate this file to v4 datasets/epochs or remove it once confirmed unused.
 ### model
 model_name_or_path: /mnt/shared-storage-user/wenxiaoyu/models/Qwen2.5-7B-Instruct
 # resume_from_checkpoint:

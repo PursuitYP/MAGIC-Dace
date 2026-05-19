@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # =========================
-# DACE 官方定义（与结果文件对齐）
+# DACE 官方定义（与结果文件对齐；v4: 12 risks — pruned S12 Sexual Content + S14 Code Interpreter Abuse）
 # =========================
 
 RISK_CATEGORIES = [
@@ -21,9 +21,7 @@ RISK_CATEGORIES = [
     "Indiscriminate Weapons",
     "Hate",
     "Suicide & Self-Harm",
-    "Sexual Content",
     "Elections",
-    "Code Interpreter Abuse",
 ]
 
 ATTACK_STYLES = [
@@ -104,7 +102,7 @@ def load_and_count(path, label):
 
 
 ### dace: print top-2 / bottom-2 risk categories and attack styles by marginal counts instead of the full matrix ###
-def print_top_bottom(matrix, title, k=2):
+def print_top_bottom(matrix, title, k=5):
     print(f"\n===== {title} =====")
     total = int(matrix.sum())
     print(f"total matched samples: {total}")
@@ -225,6 +223,11 @@ python data-sft/analyze_strategy_distribution.py \
     --benign  data-sft/sft_data_cot_v1nv2_v3_benign.jsonl \
     --harmful data-sft/sft_data_cot_v1nv2_v3_harmful.jsonl \
     --tag v3
+
+python data-sft/analyze_strategy_distribution.py \
+    --benign  data-sft/sft_data_cot_v4_benign.jsonl \
+    --harmful data-sft/sft_data_cot_v4_harmful.jsonl \
+    --tag v4
 
 # The --tag suffix keeps v1 / v2 / v3 heatmaps side by side (heatmap_..._v2.png, heatmap_..._v3.png)
 # and labels the printed section headers so you can eyeball the before/after comparison.

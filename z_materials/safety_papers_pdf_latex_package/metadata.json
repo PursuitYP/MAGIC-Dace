@@ -1,0 +1,442 @@
+[
+  {
+    "id": "01",
+    "category": "safety co-evolution",
+    "title": "Adversarial Attack-Defense Co-Evolution for LLM Safety Alignment via Tree-Group Dual-Aware Search and Optimization",
+    "arxiv": "2511.19218",
+    "pdf_url": "https://arxiv.org/pdf/2511.19218",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "02",
+    "category": "safety co-evolution",
+    "title": "AdvEvo-MARL: Shaping Internalized Safety through Adversarial Co-Evolution in Multi-Agent Reinforcement Learning",
+    "arxiv": "2510.01586",
+    "pdf_url": "https://arxiv.org/pdf/2510.01586",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "03",
+    "category": "safety co-evolution",
+    "title": "Adversarial Reinforcement Learning for Large Language Model Agent Safety",
+    "arxiv": "2510.05442",
+    "pdf_url": "https://arxiv.org/pdf/2510.05442",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "04",
+    "category": "safety co-evolution",
+    "title": "Chasing Moving Targets with Online Self-Play Reinforcement Learning for Safer Language Models",
+    "arxiv": "2506.07468",
+    "pdf_url": "https://arxiv.org/pdf/2506.07468",
+    "extra_pdf_urls": [
+      "https://openreview.net/pdf?id=VqQ1DXEeyo"
+    ],
+    "note": ""
+  },
+  {
+    "id": "05",
+    "category": "safety co-evolution",
+    "title": "Safety Alignment of LMs via Non-cooperative Games",
+    "arxiv": "2512.20806",
+    "pdf_url": "https://arxiv.org/pdf/2512.20806",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "06",
+    "category": "safety co-evolution",
+    "title": "The Alignment Waltz: Jointly Training Agents to Collaborate for Safety",
+    "arxiv": "2510.08240",
+    "pdf_url": "https://arxiv.org/pdf/2510.08240",
+    "extra_pdf_urls": [
+      "https://openreview.net/pdf?id=2NBS9ilNqM"
+    ],
+    "note": ""
+  },
+  {
+    "id": "07",
+    "category": "safety co-evolution",
+    "title": "Red Teaming LLMs: A Stackelberg Game Approach to AI Safety",
+    "arxiv": null,
+    "pdf_url": "https://ieeexplore.ieee.org/stamp/stamp.jsp?tp=&arnumber=11200929",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "08",
+    "category": "safety co-evolution",
+    "title": "Be Your Own Red Teamer: Safety Alignment via Self-Play and Reflective Experience Replay",
+    "arxiv": "2601.10589",
+    "pdf_url": "https://arxiv.org/pdf/2601.10589",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "09",
+    "category": "safety co-evolution",
+    "title": "TriPlay-RL: Tri-Role Self-Play Reinforcement Learning for LLM Safety Alignment",
+    "arxiv": "2601.18292",
+    "pdf_url": "https://arxiv.org/pdf/2601.18292",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "10",
+    "category": "safety co-evolution",
+    "title": "MAGIC: A Co-Evolving Attacker-Defender Adversarial Game for Robust LLM Safety",
+    "arxiv": "2602.01539",
+    "pdf_url": "https://arxiv.org/pdf/2602.01539",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "11",
+    "category": "safety co-evolution",
+    "title": "Toward Optimal LLM Alignments Using Two-Player Games",
+    "arxiv": "2406.10977",
+    "pdf_url": "https://arxiv.org/pdf/2406.10977",
+    "extra_pdf_urls": [
+      "https://aclanthology.org/2025.findings-emnlp.6.pdf"
+    ],
+    "note": ""
+  },
+  {
+    "id": "12",
+    "category": "safety co-evolution",
+    "title": "SEAS: Self-Evolving Adversarial Safety Optimization for Large Language Models",
+    "arxiv": "2408.02632",
+    "pdf_url": "https://arxiv.org/pdf/2408.02632",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "13",
+    "category": "safety co-evolution",
+    "title": "STAIR: Improving Safety Alignment with Introspective Reasoning",
+    "arxiv": "2502.02384",
+    "pdf_url": "https://arxiv.org/pdf/2502.02384",
+    "extra_pdf_urls": [
+      "https://openreview.net/pdf?id=aHzPGyUhZa"
+    ],
+    "note": ""
+  },
+  {
+    "id": "14",
+    "category": "safety co-evolution",
+    "title": "Disentangling Intent from Role: Adversarial Self-Play for Persona-Invariant Safety Alignment",
+    "arxiv": null,
+    "pdf_url": null,
+    "extra_pdf_urls": [],
+    "note": "No public URL/arXiv ID found from provided hint \"lijiajia-PIA\" during search; not downloaded."
+  },
+  {
+    "id": "15",
+    "category": "safety diversity",
+    "title": "Llama Guard: LLM-based Input-Output Safeguard for Human-AI Conversations",
+    "arxiv": "2312.06674",
+    "pdf_url": "https://arxiv.org/pdf/2312.06674",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "16",
+    "category": "safety diversity",
+    "title": "Rainbow Teaming: Open-Ended Generation of Diverse Adversarial Prompts",
+    "arxiv": "2402.16822",
+    "pdf_url": "https://arxiv.org/pdf/2402.16822",
+    "extra_pdf_urls": [
+      "https://openreview.net/pdf?id=FCsEvaMorw"
+    ],
+    "note": ""
+  },
+  {
+    "id": "17",
+    "category": "safety diversity",
+    "title": "Ferret: Faster and Effective Automated Red Teaming with Reward-Based Scoring Technique",
+    "arxiv": "2408.10701",
+    "pdf_url": "https://arxiv.org/pdf/2408.10701",
+    "extra_pdf_urls": [
+      "https://aclanthology.org/2025.findings-emnlp.634.pdf"
+    ],
+    "note": ""
+  },
+  {
+    "id": "18",
+    "category": "safety diversity",
+    "title": "Ruby Teaming: Improving Quality Diversity Search with Memory for Automated Red Teaming",
+    "arxiv": "2406.11654",
+    "pdf_url": "https://arxiv.org/pdf/2406.11654",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "19",
+    "category": "safety diversity",
+    "title": "RainbowPlus: Enhancing Adversarial Prompt Generation via Evolutionary Quality-Diversity Search",
+    "arxiv": "2504.15047",
+    "pdf_url": "https://arxiv.org/pdf/2504.15047",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "20",
+    "category": "safety diversity",
+    "title": "Diverse and Effective Red Teaming with Auto-generated Rewards and Multi-step Reinforcement Learning",
+    "arxiv": "2412.18693",
+    "pdf_url": "https://arxiv.org/pdf/2412.18693",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "21",
+    "category": "safety diversity",
+    "title": "Quality-Diversity Red-Teaming: Automated Generation of High-Quality and Diverse Attackers for Large Language Models",
+    "arxiv": "2506.07121",
+    "pdf_url": "https://arxiv.org/pdf/2506.07121",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "22",
+    "category": "safety diversity",
+    "title": "T-MAP: Red-Teaming LLM Agents with Trajectory-aware Evolutionary Search",
+    "arxiv": "2603.22341",
+    "pdf_url": "https://arxiv.org/pdf/2603.22341",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "23",
+    "category": "safety diversity",
+    "title": "The Attacker Moves Second: Stronger Adaptive Attacks Bypass Defenses Against Llm Jailbreaks and Prompt Injections",
+    "arxiv": "2510.09023",
+    "pdf_url": "https://arxiv.org/pdf/2510.09023",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "24",
+    "category": "safety diversity",
+    "title": "Agent-SafetyBench: Evaluating the Safety of LLM Agents",
+    "arxiv": "2412.14470",
+    "pdf_url": "https://arxiv.org/pdf/2412.14470",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "25",
+    "category": "safety diversity",
+    "title": "Jailbroken: How Does LLM Safety Training Fail?",
+    "arxiv": "2307.02483",
+    "pdf_url": "https://arxiv.org/pdf/2307.02483",
+    "extra_pdf_urls": [
+      "https://openreview.net/pdf?id=jA235JGM09"
+    ],
+    "note": ""
+  },
+  {
+    "id": "26",
+    "category": "safety diversity",
+    "title": "Red Teaming Language Models with Language Models",
+    "arxiv": "2202.03286",
+    "pdf_url": "https://arxiv.org/pdf/2202.03286",
+    "extra_pdf_urls": [
+      "https://aclanthology.org/2022.emnlp-main.225.pdf"
+    ],
+    "note": ""
+  },
+  {
+    "id": "27",
+    "category": "safety diversity",
+    "title": "Curiosity-driven Red-teaming for Large Language Models",
+    "arxiv": "2402.19464",
+    "pdf_url": "https://arxiv.org/pdf/2402.19464",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "28",
+    "category": "safety diversity",
+    "title": "DiveR-CT: Diversity-enhanced Red Teaming Large Language Model Assistants with Relaxing Constraints",
+    "arxiv": "2405.19026",
+    "pdf_url": "https://arxiv.org/pdf/2405.19026",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "29",
+    "category": "safety diversity",
+    "title": "CALM: Curiosity-Driven Auditing for Large Language Models",
+    "arxiv": "2501.02997",
+    "pdf_url": "https://arxiv.org/pdf/2501.02997",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "30",
+    "category": "safety diversity",
+    "title": "Learning Diverse Attacks on Large Language Models for Robust Red-Teaming and Safety Tuning",
+    "arxiv": "2405.18540",
+    "pdf_url": "https://arxiv.org/pdf/2405.18540",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "31",
+    "category": "safety diversity",
+    "title": "Jailbreak-R1: Exploring the Jailbreak Capabilities of LLMs via Reinforcement Learning",
+    "arxiv": "2506.00782",
+    "pdf_url": "https://arxiv.org/pdf/2506.00782",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "32",
+    "category": "safety diversity",
+    "title": "RedTopic: Toward Topic-Diverse Red Teaming of Large Language Models",
+    "arxiv": "2507.00026",
+    "pdf_url": "https://arxiv.org/pdf/2507.00026",
+    "extra_pdf_urls": [
+      "https://openreview.net/pdf?id=terdVfnoc5"
+    ],
+    "note": ""
+  },
+  {
+    "id": "33",
+    "category": "safety diversity",
+    "title": "Auto-RT: Automatic Jailbreak Strategy Exploration for Red-Teaming Large Language Models",
+    "arxiv": "2501.01830",
+    "pdf_url": "https://arxiv.org/pdf/2501.01830",
+    "extra_pdf_urls": [
+      "https://openreview.net/pdf?id=Pa6ak2B9jJ"
+    ],
+    "note": ""
+  },
+  {
+    "id": "34",
+    "category": "safety diversity",
+    "title": "Evolving Diverse Red-team Language Models in Multi-round Multi-agent Games",
+    "arxiv": "2310.00322",
+    "pdf_url": "https://arxiv.org/pdf/2310.00322",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "35",
+    "category": "safety diversity",
+    "title": "Understanding the Effects of RLHF on LLM Generalisation and Diversity",
+    "arxiv": "2310.06452",
+    "pdf_url": "https://arxiv.org/pdf/2310.06452",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "36",
+    "category": "safety diversity",
+    "title": "Evaluating the Evaluation of Diversity in Natural Language Generation",
+    "arxiv": "2004.02990",
+    "pdf_url": "https://arxiv.org/pdf/2004.02990",
+    "extra_pdf_urls": [
+      "https://aclanthology.org/2021.eacl-main.25.pdf"
+    ],
+    "note": ""
+  },
+  {
+    "id": "37",
+    "category": "safety diversity",
+    "title": "Explore, Establish, Exploit: Red Teaming Language Models from Scratch",
+    "arxiv": "2306.09442",
+    "pdf_url": "https://arxiv.org/pdf/2306.09442",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "38",
+    "category": "safety diversity",
+    "title": "Evolving Populations of Diverse RL Agents with MAP-Elites",
+    "arxiv": "2303.12803",
+    "pdf_url": "https://arxiv.org/pdf/2303.12803",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "39",
+    "category": "safety diversity",
+    "title": "Automated Progressive Red Teaming",
+    "arxiv": null,
+    "pdf_url": "https://aclanthology.org/2025.coling-main.260.pdf",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "40",
+    "category": "safety diversity",
+    "title": "Automatic LLM Red Teaming",
+    "arxiv": "2508.04451",
+    "pdf_url": "https://arxiv.org/pdf/2508.04451",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "41",
+    "category": "safety diversity",
+    "title": "Active Attacks: Red-teaming LLMs via Adaptive Environments",
+    "arxiv": "2509.21947",
+    "pdf_url": "https://arxiv.org/pdf/2509.21947",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "42",
+    "category": "safety diversity",
+    "title": "SIRAJ: Diverse and Efficient Red-Teaming for LLM Agents via Distilled Structured Reasoning",
+    "arxiv": "2510.26037",
+    "pdf_url": "https://arxiv.org/pdf/2510.26037",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "43",
+    "category": "safety diversity",
+    "title": "WildTeaming at Scale: From In-the-Wild Jailbreaks to (Adversarially) Safer Language Models",
+    "arxiv": "2406.18510",
+    "pdf_url": "https://arxiv.org/pdf/2406.18510",
+    "extra_pdf_urls": [
+      "https://openreview.net/pdf?id=n5R6TvBVcX"
+    ],
+    "note": ""
+  },
+  {
+    "id": "44",
+    "category": "safety diversity",
+    "title": "RedTWIZ: Diverse LLM Red Teaming via Adaptive Attack Planning",
+    "arxiv": "2510.06994",
+    "pdf_url": "https://arxiv.org/pdf/2510.06994",
+    "extra_pdf_urls": [],
+    "note": ""
+  },
+  {
+    "id": "45",
+    "category": "safety diversity",
+    "title": "MART: Improving LLM Safety with Multi-round Automatic Red-Teaming",
+    "arxiv": "2311.07689",
+    "pdf_url": "https://arxiv.org/pdf/2311.07689",
+    "extra_pdf_urls": [
+      "https://aclanthology.org/2024.naacl-long.107.pdf"
+    ],
+    "note": ""
+  },
+  {
+    "id": "46",
+    "category": "safety diversity",
+    "title": "Better Red Teaming via Searching with Large Language Model",
+    "arxiv": null,
+    "pdf_url": "https://aclanthology.org/2025.findings-acl.257.pdf",
+    "extra_pdf_urls": [],
+    "note": ""
+  }
+]

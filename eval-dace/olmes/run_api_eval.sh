@@ -20,7 +20,8 @@ MODEL="orm"
 
 # Output directory
 # OUTPUT_DIR="./results/ablation/nocot-s150-q257b-it/if-eval-qwen-defonly-$(date +%Y%m%d_%H%M%S)"
-MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
+# MODEL_NAME="DACE-Qwen2.5-7B-full-step300"
+MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
 OUTPUT_DIR="/mnt/shared-storage-user/yupeng/MAGIC/eval-dace/olmes/results/dace/ifeval/$MODEL_NAME-$(date +%Y%m%d_%H%M%S)"
 
 #OUTPUT_DIR="./results/eval-1.20/0120-s255-l318/if-eval-qwen-defonly-$(date +%Y%m%d_%H%M%S)"

@@ -1,0 +1,1098 @@
+
+\documentclass{article} % For LaTeX2e
+\usepackage{iclr2026_conference,times}
+
+% Optional math commands from https://github.com/goodfeli/dlbook_notation.
+\input{math_commands.tex}
+
+\newcommand{\ying}[1]{{\bf \color{blue} [Ying: #1]}}
+\newcommand{\zeyuan}[1]{{\bf \color{green} [Zeyuan: #1]}}
+\newcommand{\shao}[1]{{\bf \color{pink} [Shao: #1]}}
+\newcommand{\todo}[1]{{\bf \color{red} [TODO: #1]}}
+
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs, multirow}
+% \usepackage{cleveref}
+
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage{cleveref}
+
+% 定义新命令来为正数和负数增益添加颜色
+% 红色用于正增益
+\newcommand{\posgain}[1]{\textcolor{red}{(+#1)}}
+% 绿色用于负增益
+\newcommand{\neggain}[1]{\textcolor{green}{(-#1)}}
+
+
+\usepackage[breakable]{tcolorbox}   % 仅加 breakable 即可跨页
+
+
+% Structured In-context Environment Scaling for LLM Reasoning
+% Reinforcing LLM Reasoning via Structured In-context Environment Scaling
+\title{Structured In-context Environment Scaling for Large Language Model Reasoning}
+% \title{Structured In-context Environment Scaling for LLM Reasoning}
+% \title{Reinforcing LLM Reasoning via Structured In-context Environment Scaling}
+% \title{Learning to Reason in Structured In-context Environments with Reinforcement Learning}
+
+% Authors must not appear in the submitted version. They should be hidden
+% as long as the \iclrfinalcopy macro remains commented out below.
+% Non-anonymous submissions will be rejected without review.
+
+% \author{Antiquus S.~Hippocampus, Natalia Cerebro \& Amelie P. Amygdale \thanks{ Use footnote for providing further information
+% about author (webpage, alternative address)---\emph{not} for acknowledging
+% funding agencies.  Funding acknowledgements go at the end of the paper.} \\
+% Department of Computer Science\\
+% Cranberry-Lemon University\\
+% Pittsburgh, PA 15213, USA \\
+% \texttt{\{hippo,brain,jen\}@cs.cranberry-lemon.edu} \\
+% \And
+% Ji Q. Ren \& Yevgeny LeNet \\
+% Department of Computational Neuroscience \\
+% University of the Witwatersrand \\
+% Joburg, South Africa \\
+% \texttt{\{robot,net\}@wits.ac.za} \\
+% \AND
+% Coauthor \\
+% Affiliation \\
+% Address \\
+% \texttt{email}
+% }
+
+
+\author{Peng Yu, Zeyuan Zhao, Shao Zhang, Luoyi Fu, Xinbing Wang, Ying Wen\thanks{Ying Wen is the corresponding author.} \\
+Shanghai Jiao Tong University \\
+\texttt{\{pursuit\_yp,zhaozeyuan1102,shaozhang,yiluofu,xwang8,ying.wen\}@sjtu.edu.cn}
+}
+
+
+% The \author macro works with any number of authors. There are two commands
+% used to separate the names and addresses of multiple authors: \And and \AND.
+%
+% Using \And between authors leaves it to \LaTeX{} to determine where to break
+% the lines. Using \AND forces a linebreak at that point. So, if \LaTeX{}
+% puts 3 of 4 authors names on the first line, and the last on the second
+% line, try using \AND instead of \And before the third author name.
+
+\newcommand{\fix}{\marginpar{FIX}}
+\newcommand{\new}{\marginpar{NEW}}
+
+\iclrfinalcopy % Uncomment for camera-ready version, but NOT for submission.
+\begin{document}
+
+
+\maketitle
+
+\begin{abstract}
+Large language models (LLMs) have achieved significant advancements in reasoning capabilities through reinforcement learning (RL) via environmental exploration. As the intrinsic properties of the environment determine the abilities that LLMs can learn, the environment plays an important role in the RL finetuning process. An ideal LLM reasoning environment should possess three core characteristics: scalability, generalizable reasoning, and verifiability. However, existing mathematical and coding environments are difficult to scale due to heavy reliance on expert annotation, while the skills learned in game-based environments are too specialized to generalize. To bridge this gap, we introduce the \textbf{S}tructured \textbf{I}n-context \textbf{E}nvironment (SIE) framework. SIE achieves scalability by automatically constructing reasoning environments from large-scale structured data, where the rich compositional patterns naturally support generalizable reasoning. Moreover, the explicit schemas and reasoning chains in structured data provide a foundation for rule-based verifiability. Experimental results show that the SIE framework not only achieves substantial improvements in in-domain structured reasoning, but also enables the learned compositional reasoning skills to generalize effectively to out-of-domain mathematical and logical reasoning tasks. We further explored learning in information-limited partial SIEs and found that LLMs can infer the missing information through exploring the environment, leading to robust reasoning improvements and generalization performance. Our code can be available at \url{https://github.com/PursuitYP/SIE_ICLR}.
+\end{abstract}
+
+
+\section{Introduction}
+Fine-tuning large language models (LLMs) with reinforcement learning (RL) has emerged as a dominant post-training paradigm for eliciting complex reasoning capabilities \citep{jaech2024openai, guo2025deepseek, team2025kimi, comanici2025gemini}. This mechanism of learning from environmental feedback enables LLMs to acquire crucial reasoning strategies such as self-reflection, backtracking, and chain-of-thought. RL fine-tuning has shown significant progress in math reasoning and code generation \citep{zeng2025simplerl, hu2025open, chen2025r1}, and is gradually being extended to more challenging applications, such as interacting with search engines and building deep research agents \citep{jin2025search, zheng2025deepresearcher, li2025webthinker, tongyidr}. 
+
+Despite recent advancements in improving LLM reasoning via RL fine-tuning, existing research has focused primarily on algorithmic optimizations \citep{shao2024deepseekmath, hu2025reinforce++, zheng2025group}, while the crucial role of the training environment has been comparatively overlooked. The intrinsic properties of the environment directly determine the capabilities that can be incentivized and shaped by the model. An ideal LLM reasoning environment should possess three key characteristics: (1) \textbf{Scalability}: The ability to construct large-scale, high-quality training environments from massive data sources in an automated and cost-effective manner. (2) \textbf{Generalizable Reasoning}: The reasoning strategies and cognitive patterns learned within the environment should be effectively transferred to other general-purpose reasoning domains.  (3) \textbf{Verifiability}: The environment should possess clear, objective rules or mechanisms to verify the correctness of the answer. 
+
+A critical challenge in the current stage is how to automate the construction of scalable and high-quality LLM reasoning environments that meet the above requirements. However, existing LLM training environments generally fail to satisfy all these desiderata. One category is internalized-rule environments (e.g., mathematics), whose underlying structures are learned by LLMs during pre-training, but their construction relies on expensive expert annotations, limiting scalability \citep{cobbe2021training, lightman2023let}. Another category is externalized-rule environments (e.g., game engines), which have explicit rules, but the skills acquired from them are often highly specialized and do not generalize well to other reasoning domains \citep{wen2024reinforcing, zhang2025leveraging}. 
+
+To address the challenges of high construction costs and limited generalization in existing RL environments, we explore the potential of automatically constructing such high-quality reasoning environments from massive structured data. Structured data refers to data organized according to a predefined schema, where fields, types, and constraints are explicitly defined, allowing for direct locating, retrieval, and querying of data items \citep{codd1970relational, chang2019nist}. Building training environments from structured data offers inherent advantages. First, the abundance of real-world structured resources (e.g., knowledge graphs and tabular data) enables automated and \textbf{scalable} environment construction through multi-hop retrieval and data composition. Second, since structured data represents a highly condensed form of human experience and domain knowledge, the reasoning patterns learned from it have strong potential to \textbf{generalize} to general reasoning tasks. Third, the explicit schemas and constraints inherent in structured data allow for rigorous rule-based \textbf{verification} of facts and outcomes. Therefore, building high-quality LLM training environments from structured data is not only feasible but also promising for balancing scalability and generalizability. 
+
+\begin{figure*}[t!]
+\centering 
+\includegraphics[width=0.95\textwidth]{figures/KG_to_MDP-v4.pdf}
+% \vspace{-5pt}
+\caption{SIE constructs scalable, generalizable and verifiable in-context environments from structured data: an automated pipeline extracts local structured contexts from knowledge graphs, creates partial environments of varying difficulty, and uses rule-based reward to guide LLM learning.}
+\label{method-outline-in-intro}
+\vspace{-20pt}
+\end{figure*} 
+
+
+Motivated by these insights, we propose the \textbf{S}tructured \textbf{I}n-context \textbf{E}nvironment (SIE) framework. This framework is a flexible implementation of a structured environment, where its dynamics are encoded as a structured context and placed within the LLM's prompt as a soft constraint. The LLM's exploration within this context is modeled as implicit actions, and the resulting output can be directly used to derive reward signals for RL fine-tuning. This relaxed design simplifies implementation and scaling, while allowing seamless integration with mainstream RL fine-tuning algorithms. 
+As shown in \Cref{method-outline-in-intro}, SIE comprises three core components: First, we design an automated pipeline to extract a local supportive structured environment from massive structured data to serve as the context for each task instance. Second, by dynamically controlling the effective information in this context, we construct a series of partial environments with varying difficulty to systematically study the learning efficiency and reasoning generalization of LLMs under information-constrained conditions. Finally, we devise a rule-based verifiable reward for RL fine-tuning to guide the LLM in learning the cognitive paradigms and compositional reasoning strategies embedded within the environment. 
+
+As a concrete implementation of the SIE framework, we choose knowledge graphs (KGs) as the structured data sources. KG triples provide a highly structured representation of human knowledge and contain domain-specific cognitive primitives; multi-hop paths formed by connecting multiple triples naturally correspond to complex reasoning processes and thus serve as excellent scaffolding for learning high-level compositional reasoning capability. We construct SIEs of varying scales and difficulties based on the Freebase KG \citep{bollacker2008freebase} and fine-tune the Qwen and Llama series of models using the GRPO algorithm \citep{shao2024deepseekmath}. Experimental results demonstrate that models fine-tuned with RL in the SIE not only achieve significant improvements on in-domain structured reasoning tasks but also effectively transfer their learned reasoning strategies to out-of-domain mathematical and logical reasoning tasks, exhibiting superior generalization. 
+
+The main contributions of this paper are as follows:
+\begin{itemize}
+    \item We propose and formalize the Structured In-context Environment (SIE) framework, using environmental complexity and context information as core experimental axes to systematically investigate the effectiveness and efficiency of fine-tuning LLMs with RL on SIEs. 
+    \item We automatically construct a series of partial SIEs of varying difficulty levels based on the Freebase KG. Experimental results not only validate the efficiency of RL fine-tuning in the constructed SIEs but also reveal that the learned cognitive pattern and compositional strategies can be generalized to boarder mathematical and logical reasoning domains. 
+    \item We provide a comprehensive analysis of how partial information affect LLM learning process, finding that information-constrained environments can effectively shift the model's reasoning paradigm from shallow memory retrieval to deeper compositional reasoning. 
+\end{itemize}
+
+
+
+
+
+\section{Structured In-context Environment for LLM Reasoning}
+This section presents the Structured In-context Environment (SIE) framework to improve the structured reasoning capabilities of LLMs and promote reasoning generalization. As shown in \Cref{method-overview}, we first introduce how to automatically construct SIEs from large-scale KGs, and then explain how to treat SIEs as the in-context soft constraint to fine-tune LLMs with reinforcement learning (RL).
+
+\subsection{Construction Pipeline of SIEs}
+\label{sec3.1}
+We instantiate the SIE framework using multi-hop knowledge graph question answering (KGQA) tasks and its underlying KGs. In KGQA tasks, the correct answer corresponds to a specific subgraph of KG $\mathcal{G}$ that contains the complete reasoning path from the question to the answer. Therefore, this subgraph serves as the ideal structured context for the task. As shown in \Cref{method-outline-in-intro}, the task is modeled as an implicit Markov Decision Process (MDP), where the LLM performs strategic exploration in the SIE based on the question. In the MDP, for the $i$-th sample at time step $t$, the state $s_{i,t}$ corresponds to the subgraph currently explored, the action $a_{i,t}$ corresponds to selecting the entity for further exploration, the state transition reflects the updated subgraph after executing the action, and final the reward $r_i$ is given by an external verifier based on the LLM response $y_i$. 
+The automated SIE construction pipeline includes the following four steps: (1) seed subgraph retrieval, (2) supporting subgraph extraction, (3) distractor subgraph filtering, and (4) constructing partial SIEs.
+
+\textbf{Step 1: Seed Subgraph Retrieval.}
+For each KGQA instance \{question $\mathcal{Q}$, answer $\mathcal{A}$, question entity set $\mathcal{E}_\mathcal{Q}$, answer entity set $\mathcal{E}_\mathcal{A}$\}, we treat the question entities in $\mathcal{E}_\mathcal{Q}$ as seed nodes and perform multi-hop retrieval on $\mathcal{G}$ to obtain an initial seed subgraph $\mathcal{G}_{seed}$ that contains potential reasoning paths. However, a naive breadth-first search would lead to exponential growth of the subgraph and severely impact processing efficiency. For example, a three-hop expansion from a single seed node in the Freebase KG, which contains 2.56 million entities and 8.3 million triples, can produce hundreds of thousands of triples. Thus, we adopt a more efficient bidirectional retrieval strategy: we perform multi-hop retrieval from both the question side and the answer side, while enforcing the sum of hops from the two directions equals the maximum hop $n_{hop}$ of the task. This approach significantly reduces the size of the seed subgraph and alleviates the computational burden for subsequent steps.
+\begin{equation}
+    \mathcal{G}_{seed} = \text{MultiHopSearch}(\mathcal{G}, \mathcal{E}_\mathcal{Q}, q_{hop}) \cup \text{MultiHopSearch}(\mathcal{G}, \mathcal{E}_\mathcal{A}, a_{hop}),
+\end{equation}
+where $\mathcal{G}$ is the original KG, $\mathcal{E}_\mathcal{Q}$ and $\mathcal{E}_\mathcal{A}$ are the sets of question and answer entities, respectively. The terms $q_{hop}$ and $a_{hop}$ represent the hop counts for the retrieval from the question and answer entities, where their sum must equal the maximum hop $n_{hop}$ of the task (i.e., $q_{hop} + a_{hop} = n_{hop}$).
+
+\begin{figure*}[t]
+\centering 
+\includegraphics[width=0.95\textwidth]{figures/SIE-Method-Export-v3.pdf}
+\caption{Overview of the \textbf{SIE} framework. \textbf{Up}: The automated construction pipeline for SIEs involves four key steps: (1) Seed Subgraph Retrieval; (2) Supporting Subgraph Extraction; (3) Distractor Subgraph Filtering; and (4) Constructing Partial SIEs. \textbf{Down}: We apply the GRPO algorithm to perform RL fine-tuning of LLMs within the SIEs to elicit structured reasoning capabilities.}
+\label{method-overview}
+\vspace{-15pt}
+\end{figure*} 
+
+\textbf{Step 2: Supporting Subgraph Extraction.}
+Given the seed subgraph $\mathcal{G}_{seed}$, our goal is to precisely extract all valid reasoning paths connecting the question entities $\mathcal{E}_\mathcal{Q}$ to the answer entities $\mathcal{E}_\mathcal{A}$, which together form the supporting subgraph $\mathcal{G}_{support}$. Considering that a question may involve multiple question entities and have multiple correct answers, we retain all question entities and the top ten correct answers. We then run the Dijkstra's algorithm to find all shortest paths between the source question entity set $\mathcal{E}_\mathcal{Q}$ and the target answer entity set $\mathcal{E}_\mathcal{A}$, within the maximum hop limit $n_{hop}$. The resulting supporting subgraph $\mathcal{G}_{support}$ not only ensures the inclusion of the structured knowledge necessary to answer $\mathcal{Q}$ but also maintains a manageable size. Due to a semantic misalignment between $\mathcal{Q}$ and $\mathcal{G}$, the supporting subgraph for some questions may be empty; we retain these instances to study the impact of environmental incompleteness on the LLM reasoning and generalization.
+\begin{equation}
+    \mathcal{G}_{support} = \text{ShortestPathSearch}(\mathcal{G}_{seed}, \mathcal{E}_Q, \mathcal{E}_A, n_{hop}),
+\end{equation}
+where $\mathcal{G}_{seed}$ is the seed subgraph from the previous step and $n_{hop}$ is the maximum hop for the task.
+
+
+\textbf{Step 3: Distractor Subgraph Filtering.}
+After removing the supporting subgraph $\mathcal{G}_{support}$ from the seed subgraph $\mathcal{G}_{seed}$, the remaining triples constitute the distractor subgraph $\mathcal{G}_{distract}$. However, the initial distractor subgraph is still too large (e.g., averaging nearly 10,000 triples), exceeding the context length limitations of LLMs. To resolve this, we designed a two-stage semantic filtering process to preserve the most relevant and challenging distractor information. 
+Specifically, we use the pre-trained cross-encoder model ms-marco-MiniLM-L12-v2 for reranking. The first stage is relation filtering: we extract all relations from the initial distractor subgraph, calculate their semantic similarity to the original question $Q$, and retain the top-ranking relations $rel_{retain}$. The second stage is triple filtering: we keep only those triples with relation in $rel_{retain}$ from the previous step, and then calculate their semantic similarity to $Q$ and keep the top-ranking triples to form the final distractor subgraph $\mathcal{G}_{distract}$. 
+This two-stage semantic ranking balances environment complexity design with context length constraints, producing $\mathcal{G}_{distract}$ that is meaningful and challenging.
+\begin{align}
+rel_{retain} &= \text{FilterRelation}(\mathcal{G}_{seed} \setminus \mathcal{G}_{support}, \mathcal{Q}), \\
+\mathcal{G}_{distract} &= \text{FilterTriple}(\mathcal{G}_{seed} \setminus \mathcal{G}_{support}, \mathcal{Q}, rel_{retain}),
+\end{align}
+where $\mathcal{G}_{seed}$ and $\mathcal{G}_{support}$ are the seed subgraph and supporting subgraph, respectively. The notation $\mathcal{G}_{seed} \setminus \mathcal{G}_{support}$ denotes the triples in $\mathcal{G}_{seed}$ that are not in $\mathcal{G}_{support}$, $\mathcal{Q}$ is the original question, and $rel_{retain}$ is the set of retained relations after the first-stage filtering.
+
+
+\textbf{Step 4: Constructing Partial SIEs.}
+After completing the three subgraph extraction steps, we merge and randomly shuffle the triples from $\mathcal{G}_{support}$ and $\mathcal{G}_{distract}$ to form the final Structured In-context Environment (SIE). Each sample in the SIE is represented as (question $\mathcal{Q}$, structured in-context $\mathcal{SI}$, answer $\mathcal{A}$), where the structured in-context $\mathcal{SI}$ is placed in the reasoning prompt to serve as a soft constraint. 
+To systematically study the impact of varying difficulty and incomplete information on LLM reasoning, we constructed a series of partial SIEs by controlling the retention ratio of $\mathcal{G}_{support}$. Specifically, we set a series of retention ratios at \{100\%, 75\%, 50\%, 25\%, 0\%\} and adjusted the size of $\mathcal{G}_{distract}$ accordingly to keep the total length of the context constant. This corresponds to five partial SIEs with increasing difficulty: SIE-100\%, SIE-75\%, SIE-50\%, SIE-25\%, and SIE-0\%. This suite of SIEs simulates a progression from a complete to a progressively more incomplete environment, allowing us to systematically study how LLM reasoning evolve under information-constrained conditions. 
+{\small
+\begin{equation}
+    \text{SIE-}ratio = \text{Shuffle}(\text{Retain}(\mathcal{G}_{support}, ratio) \cup \mathcal{G}_{distract}) \ \text{for } ratio \in \{100\%, 75\%, 50\%, 25\%, 0\%\},
+\end{equation}
+}
+where $\text{SIE-}ratio$ is the partial SIE for difficulty level $ratio$, $\mathcal{G}_{support}$ and $\mathcal{G}_{distract}$ are the supporting and distractor subgraphs, respectively. The function $\text{Retain}(\cdot, ratio)$ randomly samples a subset of the triples from $\mathcal{G}_{support}$ based on the corresponding retention $ratio$. 
+
+
+\subsection{RL Post-training within SIEs}
+In the SIE framework, we treat the environment as a soft in-context constraint for LLM reasoning. The LLM is required to explore this provided in-context environment to perform multi-hop compositional reasoning. This setup makes it very convenient to fine-tune LLMs using various RL algorithms, which ensures training scalability. We leveraged the GRPO algorithm \citep{shao2024deepseekmath} to perform efficient RL fine-tuning on a range of open-source LLMs. This algorithm eliminates the need for a separate critic model and uses group relative scoring as a baseline to calculate the advantage, which significantly simplifies the training process. 
+Given a question and its corresponding structured in-context as the reasoning input, denoted as $x = (\mathcal{Q}, \mathcal{SI})$, and a ground-truth answer $y^* = \mathcal{A}$ from the environment, GRPO samples a group of responses $\{y_1, y_2, \dots, y_G\}$ from the old policy $\pi_{\theta_{\text{old}}}$ and optimizes the current policy model $\pi_{\theta}$ by maximizing the following objective:
+\vspace{-5pt}
+{\small
+\begin{subequations}
+\begin{align}
+\mathcal{J}_{\text{GRPO}}(\theta)
+&= \mathbb{E}_{\substack{(x, y^*) \sim \mathcal{SIE} \\ \{y_i\}_{i=1}^G \sim \pi_{\theta_{\text{old}}}(\cdot \mid x)}} \Big[
+ \tfrac{1}{G}\sum_{i=1}^G 
+ \Big(
+   \min\!\Big(
+     \frac{\pi_\theta(y_i \mid x)}{\pi_{\theta_{\text{old}}}(y_i \mid x)} A_i,\;
+ \nonumber \\
+&\hspace{0pt}
+     \operatorname{clip}\!\Big(
+       \frac{\pi_\theta(y_i \mid x)}{\pi_{\theta_{\text{old}}}(y_i \mid x)},\;
+       1-\epsilon,\;1+\epsilon
+     \Big) A_i
+   \Big)
+   - \beta\, \mathbb{D}_{\text{KL}}(\pi_\theta \,\|\, \pi_{\text{ref}})
+ \Big)
+\Big], \label{eq:grpo} \\[6pt]
+\mathbb{D}_{\text{KL}}(\pi_\theta \,\|\, \pi_{\text{ref}})
+&= \frac{\pi_{\text{ref}}(y_i \mid x)}{\pi_\theta(y_i \mid x)}
+  - \log\!\frac{\pi_{\text{ref}}(y_i \mid x)}{\pi_\theta(y_i \mid x)} - 1,
+\label{eq:grpo-kl} \\[6pt]
+A_i
+&= \frac{\,r_i - \mathrm{mean}(\{r_1, r_2, \ldots, r_G\})\,}
+        {\,\mathrm{std}(\{r_1, r_2, \ldots, r_G\})\,},
+\label{eq:grpo-advantage}
+\end{align}
+\end{subequations}
+}
+where $\epsilon$ and $\beta$ are hyper-parameters, and $A_i$ is the 
+group-normalized advantage computed from the set of rewards 
+$\{r_1, r_2, \ldots, r_G\}$ within each group. 
+
+For the structured reasoning template, we modified the DeepSeek-R1 \citep{guo2025deepseek} prompt to guide the model to perform step-by-step reasoning within \texttt{<think>} and \texttt{</think>} tags, placing the final answer in \texttt{<answer>} and \texttt{</answer>} tags. We used two types of rewards to perform RL fine-tuning on LLMs: an answer reward and a format reward. For the answer reward, we extract the final answer from the \texttt{<answer>} and \texttt{</answer>} tags and perform an exact match with the ground-truth answer, giving a reward of 1.0 for a successful match and 0.0 otherwise. For the format reward, we introduced an additional positive reward to encourage the model to follow the established thinking and answer paradigm. This rule-based reward mechanism effectively prevents reward hacking and ensures that the model optimizes toward the correct reasoning objective, guiding the LLM to learn the compositional reasoning paradigm inherent in the structured environment.
+
+
+% RQ1：有效性，Structured In-context Environment相对于不提供上下文环境，结构化推理的提升
+% RQ2：高效性，RL on Structured In-context Environment vs. SFT on Structured Reasoning Data
+% RQ3：泛化性，在Structured In-context Environment中训练后，泛化到数学和逻辑推理
+% RQ4：鲁棒性，在一系列Partial Structured In-context Environment中训练，推理范式和泛化能力的变化
+% ---
+% Analysis 1：different RL algorithms
+% Analysis 2：[SFT on SRD + RL on SIE]
+% Analysis 3：Case Study
+\section{Experiments}
+To systematically evaluate the effectiveness of the SIE framework, we conducted comprehensive experiments to answer the following four research questions (RQs): 
+(1) \textbf{RQ1}: Can using a structured environment as the context for LLM reasoning effectively elicit and improve structured reasoning capabilities? 
+(2) \textbf{RQ2}: Compared to structured reasoning data (SRD), is the SIE more efficient in boosting the reasoning abilities of LLMs? 
+(3) \textbf{RQ3}: Can the structured reasoning skills learned within the SIE generalize to more general out-of-domain reasoning tasks? 
+(4) \textbf{RQ4}: How does RL fine-tuning on partial SIEs affect the LLM's reasoning and generalization performance? 
+
+
+\subsection{Experimental Setup}
+
+\subsubsection{Datasets and Metrics}
+\textbf{Training Settings.} We constructed the SIE instances on the Freebase KG, leveraging the widely used KGQA datasets WebQSP \citep{yih2016value} and CWQ \citep{talmor2018web}. 
+Following the pipeline in \Cref{sec3.1}, we constructed partial SIEs by adjusting the retention ratio of $\mathcal{G}_{support}$: SIE-100\%, SIE-75\%, SIE-50\%, SIE-25\%, and SIE-0\%. This setup allows us to study how reasoning abilities evolve in information-constrained environments. 
+In addition, we distill the structured contexts from SIE into the corresponding structured reasoning data (SRD) using the DeepSeek-R1 API \citep{guo2025deepseek}, enabling a direct comparison of learning efficiency between SIE-based in-context RL fine-tuning and conventional supervised fine-tuning on structured data.
+
+\textbf{Test Datasets.} For structured reasoning, we used the WebQSP, CWQ, and GrailQA \citep{gu2021beyond} test sets to create similar SIEs for in-domain evaluation. Notably, GrailQA was held out from the training setting to serve as in-domain generalization. Following ToG \citep{sun2023think}, we randomly sample 1,000 samples from the original GrailQA test set for evaluation. For general reasoning evaluation, we conducted out-of-domain generalization tests in both the mathematical and logical reasoning domains. For mathematical reasoning, we used GSM8K \citep{cobbe2021training} and MATH500 \citep{lightman2023let}, which stress arithmetic problem solving and higher-level symbolic/algebraic reasoning, respectively. For logical reasoning, we used two subsets of the Knights and Knaves puzzle dataset \citep{xie2024memorization}: KK-easy (simple scenarios with 2-3 characters) and KK-hard (complex scenarios with 4-5 characters). In the puzzle task, the model must deduce which characters are truth-telling knights and which are lying knaves based on a series of statements. For all datasets, we use strict zero-shot evaluation and report pass@1 performance as the metric.
+
+
+\subsubsection{Baselines}
+To comprehensively evaluate the effectiveness of the SIE framework, we used the following baseline setups: (1) \textbf{RL w/ SIE}: This is our proposed core framework, which involves using RL fine-tuning on LLMs within the series of constructed SIEs. (2) \textbf{CoT} (Chain-of-Thought Prompting): This is a training-free baseline that uses step-by-step prompting to guide the model to reason within the SIE environment and generate an answer. (3) \textbf{RL w/o Context}: This method removes the structured environment from the SIE, directly performing RL fine-tuning on the LLM using (question, answer) pairs. This baseline directly addresses RQ1 by verifying the effectiveness of SIEs for structured reasoning. (4) \textbf{SFT w/ SRD} (Supervised Fine-Tuning with Structured Reasoning Data):  We used the DeepSeek-R1 API to convert samples from our constructed SIEs into corresponding Structured Reasoning Data (SRD) through chain-of-thought distillation and rejection sampling \citep{yuan2023scaling}. We then used supervised fine-tuning (SFT) to train the LLM on this SRD. For the SFT process, the LLM is prompted with (question, structured triples) and is required to generate the corresponding (reasoning chain, answer). This setup is designed to address RQ2 by investigating the training efficiency of RL fine-tuning in SIEs compared to conventional SFT training in SRD.
+
+
+\subsubsection{Implementation Details}
+We fine-tuned a variety of open-source LLMs, including Qwen2.5-7B-Instruct \citep{yang2025qwen3}, Llama3.1-8B-Instruct \citep{grattafiori2024llama}, Qwen2.5-7B, and Qwen3-8B, using the GRPO algorithm \citep{shao2024deepseekmath} within the constructed SIEs. Among these LLMs, Qwen2.5-7B-Instruct, Llama3.1-8B-Instruct, and Qwen3-8B are instruction-tuned models, while Qwen2.5-7B is a base model that has only undergone pre-training. 
+The entire RL post-training pipeline within the SIE was implemented using the VeRL framework \citep{sheng2025hybridflow}. For all SIE instances (SIE-100\%, SIE-75\%, SIE-50\%, SIE-25\%, and SIE-0\%), we used a maximum prompt length of 8,192 tokens and a maximum response length of 2,048 tokens. Unless specified otherwise, subsequent mention of SIE refers to the SIE-100\% setting, which retains the complete supporting subgraph. 
+
+
+
+\subsection{Main Results}
+\textbf{The SIE Framework Effectively Enhances LLM Structured Reasoning (RQ1).} 
+To analyze the effectiveness of the structured environment, we compared two distinct RL fine-tuning baselines: RL w/o Context (no structured context provided) and RL w/ SIE (structured context provided). 
+\Cref{tab:my_label_modified} summarizes the performance of various LLMs on three structured reasoning tasks: WebQSP, CWQ, and GrailQA. The results show a consistent and substantial performance improvement across all LLMs when RL fine-tuning is conducted within the SIE, compared to the setting without structured context. 
+Specifically, after RL fine-tuning within the SIE, the LLMs achieved an average structured reasoning improvement of 34.4\% on WebQSP, 50.2\% on CWQ, and 62.6\% on GrailQA. These results demonstrate the effectiveness of the SIE framework in promoting structured reasoning. 
+
+\begin{table}[!t]
+\centering
+\caption{Structured reasoning evaluation under different RL fine-tuning settings. The red number in parentheses indicates the performance gains of RL w/ SIE over RL w/o Context. RL within the SIE significantly surpasses RL without a structured context, demonstrating the \textbf{effectiveness} of SIE.}
+\vspace{-10pt}
+\label{tab:my_label_modified}
+\scalebox{0.72}{
+\begin{tabular}{lcccccccc}
+\toprule
+\multirow{2}{*}{\textbf{Datasets}} & \multicolumn{2}{c}{\textbf{Qwen2.5-7B-Instruct}} & \multicolumn{2}{c}{\textbf{Llama3.1-8B-Instruct}} & \multicolumn{2}{c}{\textbf{Qwen2.5-7B}} & \multicolumn{2}{c}{\textbf{Qwen3-8B}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+& \textbf{w/o Context} & \textbf{w/ SIE} & \textbf{w/o Context} & \textbf{w/ SIE} & \textbf{w/o Context} & \textbf{w/ SIE} & \textbf{w/o Context} & \textbf{w/ SIE} \\
+\midrule
+WebQSP & 59.7 & \textbf{93.4 \textcolor{red}{(+33.7)}} & 61.3 & 93.2 \textcolor{red}{(+31.9)} & 62.8 & 93.2 \textcolor{red}{(+30.4)} & 48.6 & 90.2 \textcolor{red}{(+41.6)} \\
+CWQ & 36.7 & 87.7 \textcolor{red}{(+51.0)} & 39.7 & \textbf{89.7 \textcolor{red}{(+50.0)}} & 38.4 & 89.3 \textcolor{red}{(+50.9)} & 29.7 & 78.6 \textcolor{red}{(+48.9)} \\
+GrailQA & 20.8 & \textbf{85.8 \textcolor{red}{(+65.0)}} & 24.9 & 85.0 \textcolor{red}{(+60.1)} & 19.5 & 81.5 \textcolor{red}{(+62.0)} & 21.8 & 85.1 \textcolor{red}{(+63.3)} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+
+\textbf{RL Fine-tuning in SIE is More Efficient than SFT on SRD (RQ2).} 
+Next, we analyzed the efficiency of SIE by comparing three reasoning baselines: CoT (Chain-of-Thought prompting), SFT w/ SRD (Supervised Fine-Tuning on Structured Reasoning Data), and RL w/ SIE (Reinforcement Learning fine-tuning in the Structured In-context Environment). 
+\Cref{tab:performance_comparison} presents the results for Qwen2.5-7B-Instruct and Llama3.1-8B-Instruct across the three structured reasoning tasks. The results indicate that both SFT w/ SRD and RL w/ SIE yield consistent improvements over simple CoT prompting. 
+Although LLMs fine-tuned by SFT w/ SRD achieved a modest average improvement of around 11.4\% in structured reasoning across Qwen (11.3\%) and Llama (11.5\%) models, those fine-tuned by RL w/ SIE achieved a significantly greater average improvement of approximately 53.7\% (55.6\% for Qwen and 51.8\% for Llama).
+Crucially, compared to the conventional SFT w/ SRD baseline, RL w/ SIE provided an additional performance gain exceeding 40\% across all three structured reasoning tasks. 
+These results demonstrate that RL fine-tuning within the SIE is more effective at encouraging environmental exploration and thus more efficiently improving the structured reasoning capabilities of LLMs than SFT imitation learning trained on the SRD. 
+
+\begin{table}[!t]
+\centering
+\vspace{-5pt}
+\caption{Structured reasoning evaluation results under different fine-tuning methods. The red numbers in parentheses indicate the performance gains of SFT w/ SRD and RL w/ SIE relative to CoT. RL fine-tuning in SIE significantly outperforms SFT on SRD, demonstrating the \textbf{efficiency} of SIE.}
+\vspace{-10pt}
+\label{tab:performance_comparison}
+\scalebox{0.85}{
+\begin{tabular}{lllllll}
+\toprule
+\multirow{2}{*}{\textbf{Datasets}} & \multicolumn{3}{c}{\textbf{Qwen2.5-7B-Instruct}} & \multicolumn{3}{c}{\textbf{Llama3.1-8B-Instruct}} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+& \textbf{CoT} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{CoT} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} \\
+\midrule
+WebQSP & 26.3 & 40.5 \textcolor{red}{(+14.2)} & \textbf{93.4 \textcolor{red}{(+67.1)}} & 36.5 & 43.4 \textcolor{red}{(+6.9)} & 93.2 \textcolor{red}{(+56.7)} \\
+CWQ & 34.4 & 43.3 \textcolor{red}{(+8.9)} & 87.7 \textcolor{red}{(+53.3)} & 37.2 & 49.5 \textcolor{red}{(+12.3)} & \textbf{89.7 \textcolor{red}{(+52.5)}} \\
+GrailQA & 40.5 & 55.7 \textcolor{red}{(+15.2)} & \textbf{85.8 \textcolor{red}{(+45.3)}} & 43.6 & 60.0 \textcolor{red}{(+16.4)} & 85.0 \textcolor{red}{(+41.4)} \\
+\bottomrule
+\end{tabular}
+}
+\vspace{-10pt}
+\end{table}
+
+
+
+\textbf{Structured Reasoning Learned in SIEs Generalizes to Out-of-Domain Reasoning Domains (RQ3).} 
+We further analyzed the generalization of RL w/ SIE by evaluating performance on out-of-domain mathematical and logical reasoning tasks. 
+\Cref{tab:math_performance_modified} analyzes the performance of various LLMs on out-of-domain generalization datasets: GSM8K and MATH500 (representing simple and harder mathematical reasoning, respectively), and KK-easy (2-3 character logic puzzles) and KK-hard (4-5 character logic puzzles). Experimental results show that LLMs fine-tuned by RL w/ SIE achieve better generalization performance compared to CoT prmopting. 
+Note that the lower initial accuracy of the Qwen3-8B model on the MATH500 task, compared to other LLMs, is attributed to the model frequently generating overly long responses or failing to adhere to the required reasoning format, resulting in a mismatch with the verifiable answer. This phenomenon is further analyzed in \Cref{appdx:d}. 
+These LLMs achieved an average improvement of 20.4\% on GSM8K, 18.1\% on MATH500, 12.3\% on KK-easy, and 11.1\% on KK-hard after RL training. This indicates that the structured reasoning ability exhibits strong generalization to the math and logic reasoning domains. 
+
+\begin{table}[!t]
+\centering
+\caption{Out-of-domain reasoning generalization performance of different LLMs after RL fine-tuning in the in-domain SIEs. The red numbers in parentheses indicate the performance improvement of RL w/ SIE relative to CoT. These results demonstrate the strong generalizability of SIE.}
+\vspace{-10pt}
+\label{tab:math_performance_modified}
+\scalebox{0.85}{
+\begin{tabular}{lllllllll}
+\toprule
+\multirow{2}{*}{\textbf{Datasets}} & \multicolumn{2}{c}{\textbf{Qwen2.5-7B-Instruct}} & \multicolumn{2}{c}{\textbf{Llama3.1-8B-Instruct}} & \multicolumn{2}{c}{\textbf{Qwen2.5-7B}} & \multicolumn{2}{c}{\textbf{Qwen3-8B}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+& \textbf{CoT} & \textbf{RL w/ SIE} & \textbf{CoT} & \textbf{RL w/ SIE} & \textbf{CoT} & \textbf{RL w/ SIE} & \textbf{CoT} & \textbf{RL w/ SIE} \\
+\midrule
+GSM8K & 29.2 & 87.4 \textcolor{red}{(+58.2)} & 67.4 & 82.6 \textcolor{red}{(+15.2)} & 27.0 & 86.2 \textcolor{red}{(+59.2)} & 71.0 & \textbf{91.9 \textcolor{red}{(+20.8)}} \\
+MATH500 & 43.0 & \textbf{61.6 \textcolor{red}{(+18.6)}} & 38.4 & 47.0 \textcolor{red}{(+8.6)} & 30.2 & 59.2 \textcolor{red}{(+29.0)} & 20.4 & 36.6 \textcolor{red}{(+16.2)} \\
+KK-easy & 42.0 & 49.5 \textcolor{red}{(+7.5)} & 20.5 & 37.0 \textcolor{red}{(+16.5)} & 37.5 & 52.0 \textcolor{red}{(+14.5)} & 79.5 & \textbf{90.0 \textcolor{red}{(+10.5)}} \\
+KK-hard & 19.5 & 29.0 \textcolor{red}{(+9.5)} & 6.0 & 15.5 \textcolor{red}{(+9.5)} & 15.5 & 27.5 \textcolor{red}{(+12.0)} & 59.5 & \textbf{73.5 \textcolor{red}{(+14.0)}} \\
+\bottomrule
+\end{tabular}%
+}
+% \vspace{-5pt}
+\end{table}
+
+
+\textbf{RL in Partial SIEs Achieves Robust Reasoning and Generalization Performance (RQ4).} 
+Finally, we investigate the robustness of RL fine-tuning within the partial SIEs where environmental information is incomplete. We compared five SIE settings, from SIE-100\% to SIE-0\%, which correspond to a gradually increasing difficulty in the structured environment. 
+\textbf{Robustness of Structured Reasoning.} \Cref{tab:sie_performance} compares the performance of various LLMs on the WebQSP structured reasoning task. 
+All LLMs present a positive improvement in structured reasoning after RL fine-tuning across the five partial SIEs. 
+In general, the performance of the LLMs gradually decreased as the environmental difficulty increased (from SIE-100\% to SIE-0\%), achieving average gains of 64.2\%, 62.8\%, 61.6\%, 60.2\%, and 52.5\% respectively. 
+Significantly, even in the most challenging scenarios, SIE-25\% and SIE-0\%, where only 25\% of the supporting information was retained or all was removed, RL fine-tuning still brought about steady improvement in structured reasoning ability. This suggests that the reasoning pattern of LLMs evolved from shallow context retrieval to deeper compositional reasoning, learning to explore and compose information within the environment, leading to robust structured reasoning enhancement. 
+\textbf{Robustness of Generalization.} \Cref{tab:qwen_math_performance} compares the generalization performance of Qwen2.5-7B-Instruct on the out-of-domain reasoning tasks.  
+The LLM showed a positive improvement in general reasoning ability across all tasks after RL fine-tuning on partial SIEs.  
+From SIE-100\% to SIE-0\%, the model achieved average performance gains in generalization of 40.3\%, 40.1\%, 38.6\%, 38.6\%, and 38.6\% respectively. 
+These results confirm that even when fine-tuned in partial SIEs, LLMs can robustly generalize the learned compositional structured reasoning abilities to general reasoning domains. As illustrated below, we selected a representative question from the SIE-0\% scenario to compare the responses of LLMs before and after RL fine-tuning. Before RL fine-tuning, the model hallucinated and generated an incorrect answer. In contrast, after RL fine-tuning, the model recognized the insufficiency of the provided information and learned to combine its intrinsic parametric knowledge for complex multi-hop reasoning.
+\begin{tcolorbox}[
+  breakable,
+  colback=gray!10,
+  colframe=gray!60,
+  title=Case study before and after RL fine-tuning in SIE,
+  left=6pt,right=6pt,top=4pt,bottom=4pt,
+  fontupper=\scriptsize
+]
+\textbf{Question}: What is the Angelina Jolie directed movie that is 126 minutes long?
+\vspace{2pt}
+
+\textbf{Response \underline{before RL fine-tuning} in SIE-0\%}:
+From the knowledge graph, we know that Angelina Jolie directed the movie By the Sea and also directed A Place in Time...From the KG, it also states that the movie By the Sea is 126 minutes long...Thus, the movie directed by Angelina Jolie that is 126 minutes long is \textbf{By the Sea.} \quad \textcolor{blue}{\textbf{[Wrong Answer!]}}
+\vspace{2pt}
+
+\textbf{Response \underline{after RL fine-tuning} in SIE-0\%}:
+First, I need to find movies directed by Angelina Jolie...However, the knowledge triplets provided don't include the runtime information...I might have to rely on my own knowledge...Yes, In the Land of Blood and Honey \underline{\textbf{is a film directed by her and has a runtime of 126 minutes}} (\textit{learned to reasoning with its intrinsic knowledge})...Therefore, the movie is \textbf{In the Land of Blood and Honey.} \quad \textcolor{red}{\textbf{[Correct Answer!]}}
+
+\end{tcolorbox}
+
+
+
+
+
+
+
+
+
+\begin{table}[!t]
+\centering
+\vspace{-5pt}
+\caption{Structured reasoning performance on WebQSP after RL fine-tuning in partial SIEs. The red numbers in parentheses indicate the performance improvement of RL w/ SIE relative to CoT.}
+\vspace{-10pt}
+\label{tab:sie_performance}
+\scalebox{0.85}{
+\begin{tabular}{lllllllll}
+\toprule
+\multirow{2}{*}{\textbf{Setting}} & \multicolumn{2}{c}{\textbf{Qwen2.5-7B-Instruct}} & \multicolumn{2}{c}{\textbf{Llama3.1-8B-Instruct}} & \multicolumn{2}{c}{\textbf{Qwen2.5-7B}} & \multicolumn{2}{c}{\textbf{Qwen3-8B}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+& \textbf{CoT} & \textbf{RL w/ SIE} & \textbf{CoT} & \textbf{RL w/ SIE} & \textbf{CoT} & \textbf{RL w/ SIE} & \textbf{CoT} & \textbf{RL w/ SIE} \\
+\midrule
+SIE-100\% & 26.3 & \textbf{93.4 \textcolor{red}{(+67.1)}} & 36.5 & 93.2 \textcolor{red}{(+56.7)} & 2.6 & 93.2 \textcolor{red}{(+90.6)} & 47.8 & 90.2 \textcolor{red}{(+42.4)} \\
+SIE-75\% & 23.6 & 89.2 \textcolor{red}{(+65.6)} & 33.8 & \textbf{90.4 \textcolor{red}{(+56.6)}} & 2.0 & 90.2 \textcolor{red}{(+88.2)} & 47.3 & 88.0 \textcolor{red}{(+40.7)} \\
+SIE-50\% & 22.3 & 86.4 \textcolor{red}{(+64.1)} & 31.1 & \textbf{89.4 \textcolor{red}{(+58.3)}} & 2.5 & 87.2 \textcolor{red}{(+84.7)} & 44.9 & 84.0 \textcolor{red}{(+39.1)} \\
+SIE-25\% & 22.0 & 85.4 \textcolor{red}{(+63.4)} & 31.5 & \textbf{86.8 \textcolor{red}{(+55.3)}} & 1.6 & 85.8 \textcolor{red}{(+84.2)} & 44.8 & 82.6 \textcolor{red}{(+37.8)} \\
+SIE-0\% & 17.8 & 72.8 \textcolor{red}{(+55.0)} & 26.1 & \textbf{75.1 \textcolor{red}{(+49.0)}} & 1.7 & 73.4 \textcolor{red}{(+71.7)} & 36.7 & 70.8 \textcolor{red}{(+34.1)} \\
+\bottomrule
+\end{tabular}%
+}
+\vspace{-10pt}
+\end{table}
+
+\begin{table}[!t]
+% \vspace{-5pt}
+\centering
+\caption{Reasoning generalization performance of Qwen2.5-7B-Instruct after RL fine-tuning in partial SIEs. The red numbers in parentheses show the performance improvement relative to the initial CoT baseline after being trained with the corresponding RL w/ SIE.}
+\vspace{-5pt}
+\label{tab:qwen_math_performance}
+\scalebox{0.85}{
+\begin{tabular}{lllll}
+\toprule
+\textbf{Setting} & \textbf{GSM8K} & \textbf{MATH500} & \textbf{KK-easy} & \textbf{KK-hard} \\
+\midrule
+CoT & 29.2 & 43.0 & 42.0 & 19.5 \\
+SIE-100\% & 87.4 \textcolor{red}{(+58.2)} & \textbf{61.6 \textcolor{red}{(+18.6)}} & 49.5 \textcolor{red}{(+7.5)} & \textbf{29.0 \textcolor{red}{(+9.5)}} \\
+SIE-75\% & \textbf{87.7 \textcolor{red}{(+58.5)}} & 61.0 \textcolor{red}{(+18.0)} & \textbf{50.0 \textcolor{red}{(+8.0)}} & 26.0 \textcolor{red}{(+6.5)} \\
+SIE-50\% & 86.2 \textcolor{red}{(+57.0)} & 59.0 \textcolor{red}{(+16.0)} & 48.5 \textcolor{red}{(+6.5)} & 25.5 \textcolor{red}{(+6.0)} \\
+SIE-25\% & 86.0 \textcolor{red}{(+56.8)} & 60.2 \textcolor{red}{(+17.2)} & 48.0 \textcolor{red}{(+6.0)} & 24.5 \textcolor{red}{(+5.0)} \\
+SIE-0\% & 87.1 \textcolor{red}{(+57.9)} & 58.0 \textcolor{red}{(+15.0)} & 47.0 \textcolor{red}{(+5.0)} & 23.0 \textcolor{red}{(+3.5)} \\
+\bottomrule
+\end{tabular}%
+}
+% \vspace{-10pt}
+\end{table}
+
+
+
+
+
+
+\subsection{Analysis}
+We conducted additional experiments to analyze the core characteristics of RL fine-tuning in SIEs. Specifically, we investigated: (1) the framework's applicability to mainstream RL algorithms; (2) its sensitivity to the RL starting checkpoint; (3) the impact of reward mechanisms to rule out format-driven gains; (4) the decomposition of performance sources across different environmental settings.  
+
+\textbf{The SIE Framework is Applicable to Mainstream RL Fine-tuning Algorithms.} 
+We investigated the applicability of SIE by performing RL fine-tuning on Qwen2.5-7B-Instruct using REINFORCE++ \citep{hu2025reinforce++} and PPO \citep{schulman2017proximal} algorithms in addition to GRPO. 
+\Cref{tab:rl_method_comparison} summarizes the results in both the structured and general reasoning domains. The results indicate that the performance improvements and generalization achieved by REINFORCE++ are quite similar to the GRPO algorithm, while the gains from the PPO algorithm are comparatively weaker. All RL algorithms lead to improvements in structured reasoning capability and general reasoning ability. This demonstrates the universality of the SIE framework in RL fine-tuning algorithms. 
+
+\begin{table}[t!]
+\vspace{-5pt}
+\centering
+\caption{Comparison of performance improvement in structured reasoning, mathematical reasoning, and logical reasoning tasks after fine-tuning Qwen2.5-7B-Instruct with different RL algorithms. The best results are highlighted in \textbf{bold}. REINFORCE++ and GRPO show comparable performance.}
+\vspace{-5pt}
+\label{tab:rl_method_comparison}
+\scalebox{0.85}{
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Methods} & \textbf{WebQSP} & \textbf{CWQ} & \textbf{GrailQA} & \textbf{GSM8K} & \textbf{MATH500} & \textbf{KK-easy} & \textbf{KK-hard} \\
+\midrule
+CoT & 26.3 & 34.4 & 40.5 & 29.2 & 43.0 & 42.0 & 19.5 \\
+GRPO & \textbf{93.4} & 87.7 & \textbf{85.8} & \textbf{87.4} & 61.6 & \textbf{49.5} & \textbf{29.0} \\
+REINFORCE++ & 93.1 & \textbf{88.4} & 83.2 & 86.7 & \textbf{62.2} & 49.0 & 24.5 \\
+PPO & 85.4 & 73.4 & 81.4 & 78.4 & 59.6 & 49.0 & 25.0 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+
+\textbf{Starting RL from an SFT Checkpoint Enhances Generalization but Limits Structured Reasoning.} 
+We investigated the effect of cold-starting RL training by using the model fine-tuned with SFT w/ SRD as a starting checkpoint for subsequent RL w/ SIE fine-tuning (labeled RL w/ SIE f/ SFT). 
+\Cref{tab:method_comparison} shows that RL w/ SIE f/ SFT leads to further gains in both structured and general reasoning compared to the SFT checkpoint itself. 
+However, a comparison of RL w/ SIE f/ SFT and RL w/ SIE reveals a trade-off: the SFT-cold-started RL training performs worse on structured reasoning tasks (e.g., WebQSP: 88.5\% vs. 93.4\%), but achieves stronger generalization performance on out-of-domain tasks (e.g., KK-hard: 33.5\% vs. 29.0\%). 
+These results suggest that the reasoning skills learned from the long-form responses in SRD can be more effectively generalized through RL refinement. However, the SFT cold-start constrains the LLM's ability to explore the  environment, thereby limiting the maximum potential improvement in structured reasoning capability. 
+
+\begin{table}[!t]
+\vspace{-5pt}
+\centering
+\caption{Comparison of performance improvement in structured, mathematical, and logical reasoning tasks after RL fine-tuning of Qwen2.5-7B-Instruct from different starting checkpoints. The best results are highlighted in \textbf{bold}. Compared to RL w/ SIE, RL w/ SIE f/ SFT achieves better generalization in math and logic reasoning, but its improvement in structured reasoning is limited.}
+\vspace{-5pt}
+\label{tab:method_comparison}
+\scalebox{0.85}{
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Methods} & \textbf{WebQSP} & \textbf{CWQ} & \textbf{GrailQA} & \textbf{GSM8K} & \textbf{MATH500} & \textbf{KK-easy} & \textbf{KK-hard} \\
+\midrule
+% CoT & 26.3 & 34.4 & 40.5 & 29.2 & 43.0 & 42.0 & 19.5 \\
+SFT w/ SRD & 40.5 & 43.3 & 55.7 & 68.1 & 54.8 & 41.5 & 21.5 \\
+RL w/ SIE & \textbf{93.4} & \textbf{87.7} & \textbf{85.8} & 87.4 & 61.6 & 49.5 & 29.0 \\
+RL w/ SIE f/ SFT & 88.5 & 79.6 & 81.7 & \textbf{88.7} & \textbf{62.0} & \textbf{52.0} & \textbf{33.5} \\
+\bottomrule
+\end{tabular}%
+}
+\vspace{-10pt}
+\end{table}
+
+
+\textbf{Verifiable Environmental Feedback is Critical for Reasoning, Ruling Out Format Adherence and Reward Gaming.}
+To verify that the performance gains stem from learning correct reasoning logic rather than merely adhering to a specific output format or exploiting spurious signals, we introduced two ablation baselines under the RL w/ SIE-100\% setting: \textit{Format Only} (rewarding response structure without correctness) and \textit{Random + Format} (replacing correctness reward with random 0-1 noise).
+\Cref{tab:reward_ablation} summarizes the results on Qwen2.5-7B-Instruct and Llama3.1-8B-Instruct.
+The results show that the \textit{Format Only} baseline yields only marginal improvements over CoT (e.g., Qwen improves from 26.3\% to 31.6\% on WebQSP), primarily because standardized outputs facilitate answer extraction. However, this performance is significantly lower than the proposed \textit{Answer + Format} setting (93.4\%), indicating that format adherence is not the primary driver of reasoning capability.
+Furthermore, in the \textit{Random + Format} setting, the performance of the Qwen model collapses (dropping to $\sim$6\%), while the Llama model also suffers significant degradation compared to the \textit{Format Only} baseline.
+This demonstrates that the models are not gaming random signals; rather, the significant improvements in the SIE framework are driven by the model truly learning compositional reasoning patterns guided by verifiable structured environmental feedback.
+
+
+\begin{table}[!t]
+\centering
+\caption{Ablation study on reward mechanisms. \textit{Format Only} only rewards response structure without checking correctness, while \textit{Random + Format} introduces random 0-1 noise. The significant gap between these baselines and the proposed \textit{Answer + Format} reward function confirms that gains are driven by verifiable reasoning in SIEs, not format adherence or spurious correlations.}
+\vspace{-5pt} % Adjust spacing as needed
+\label{tab:reward_ablation}
+\scalebox{0.85}{
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Methods} & \textbf{WebQSP} & \textbf{CWQ} & \textbf{GrailQA} & \textbf{GSM8K} & \textbf{MATH500} & \textbf{KK-easy} & \textbf{KK-hard} \\
+\midrule
+\multicolumn{8}{l}{\textit{Qwen2.5-7B-Instruct}} \\
+\quad + CoT & 26.3 & 34.4 & 40.5 & 29.2 & 43.0 & 42.0 & 19.5 \\
+\quad + Format Only & 31.6 & 37.7 & 48.1 & 37.0 & 46.6 & 44.0 & 20.0 \\
+\quad + Random + Format & 6.3 & 6.4 & 6.7 & 12.6 & 26.6 & 40.5 & 19.0 \\
+\quad + Answer + Format & \textbf{93.4} & \textbf{87.8} & \textbf{85.8} & \textbf{87.4} & \textbf{61.6} & \textbf{49.5} & \textbf{29.0} \\
+\midrule
+\multicolumn{8}{l}{\textit{Llama3.1-8B-Instruct}} \\
+\quad + CoT & 36.5 & 37.2 & 43.6 & 67.4 & 38.4 & 20.5 & 6.0 \\
+\quad + Format Only & 45.1 & 44.1 & 56.1 & 68.8 & 43.4 & 30.0 & 11.0 \\
+\quad + Random + Format & 37.7 & 39.7 & 52.6 & 66.9 & 42.8 & 27.0 & 8.5 \\
+\quad + Answer + Format & \textbf{93.2} & \textbf{89.7} & \textbf{85.0} & \textbf{82.6} & \textbf{47.0} & \textbf{37.0} & \textbf{15.5} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+
+\textbf{The SIE Framework Promotes Reasoning Evolution from Internal Knowledge Activation to Compositional Synthesis.}
+To deconstruct the sources of the structured reasoning improvements, we compared four progressive settings using Qwen2.5-7B-Instruct: CoT w/o Context, RL w/o Context, RL w/ SIE-0\% (distractors only), and RL w/ SIE-100\% (full context).
+In WebQSP and CWQ, approximately 65\% and 40\% of the questions are single-hop, respectively.
+\Cref{tab:decomposition} reveals a step-wise evolution in capability.
+First, the jump \textit{from CoT w/o Context to RL w/o Context} (e.g., 2.0\% $\rightarrow$ 59.7\% on WebQSP) indicates that RL successfully activates the LLM's internal parametric knowledge, solving simpler, single-hop questions.
+Second, \textit{comparing RL w/ SIE-0\% to RL w/o Context} shows that even without supporting facts, the introduction of distractor subgraphs provides a negative constraint, boosting performance by an additional $\sim$13-20\% by guiding the model to prune incorrect reasoning paths based on distractor subgraphs.
+Finally, the integration of supporting subgraphs in \textit{RL w/ SIE-100\% extends the knowledge boundary of LLMs}, yielding further $\sim$20-30\% gain.
+This confirms that the complete SIE framework teaches the LLM to synthesize parametric knowledge with external structured evidence for complex, multi-hop compositional reasoning.
+
+
+\begin{table}[!t]
+\centering
+% \vspace{-5pt}
+\caption{Decomposition of performance gains across different environmental configurations. The step-wise improvements demonstrate how RL activates parametric knowledge, leverages negative constraints, and acieves compositional reasoning via internal and external knowledge synthesis.}
+\vspace{-5pt}
+\label{tab:decomposition}
+\scalebox{0.85}{
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Datasets} & \textbf{CoT w/o Context} & \textbf{RL w/o Context} & \textbf{RL w/ SIE-0\%} & \textbf{RL w/ SIE-100\%} \\
+\midrule
+WebQSP & 2.0 & 59.7 & 72.8 & \textbf{93.4} \\
+CWQ & 8.2 & 36.7 & 56.1 & \textbf{87.7} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+
+\section{Conclusion}
+In this paper, we propose the SIE framework, which automatically constructs training environments for LLM reasoning from massive amounts of structured data. We further extended this by dynamically controlling the proportion of effective information in the structured in-context to build a series of partial SIEs for deeper analysis. We then performed RL fine-tuning on LLMs within these constructed SIEs to elicit their reasoning capabilities. Comprehensive experiments demonstrate that conducting RL fine-tuning within the SIE not only effectively boosts the structured reasoning abilities of LLMs but also generalizes significantly to more general out-of-domain reasoning tasks such as mathematics and logic. By analyzing the performance of LLMs trained in the partial SIEs, we found that RL fine-tuning efficiently encourages the model to explore the environment to infer missing information, leading to robust reasoning improvements and effective generalization. 
+
+
+
+
+
+
+% \noindent\hrulefill
+
+\clearpage
+
+
+\textbf{The Use of Large Language Models.}
+We used a large language model as a general-purpose assistant solely for text editing, including grammar correction, wording and tone adjustments, punctuation, and stylistic consistency. The model did not contribute to research ideation, methodology, experimental design, data analysis, interpretation of results, or the generation of substantive academic content or references. All suggestions were reviewed and approved by the authors, who take full responsibility for the final text. 
+
+
+\textbf{Ethics Statement.}
+Our method and algorithm do not involve any adversarial attack, and will not endanger human security.
+All our experiments are performed in the simulation environment, which does not involve ethical and fair issues.
+
+
+
+\subsubsection*{Acknowledgments}
+This work was supported by the National Key R\&D Program of China (No. 2024YFC3505402), and the National Natural Science Foundation of China (No. U2244217 and No. 62525209). 
+
+\bibliography{iclr2026_conference}
+\bibliographystyle{iclr2026_conference}
+
+
+
+
+
+
+\newpage
+
+\appendix
+
+\section{Related Work}
+\label{appdx:a}
+\subsection{Improving LLM Reasoning with RL}
+RL has significantly enhanced the reasoning capabilities of LLMs \citep{guo2025deepseek, team2025kimi, xie2025logic}. However, recent research on LLM reasoning has predominantly focused on the refinement and optimization of RL algorithms, with little attention paid to the importance of the RL environment itself \citep{shao2024deepseekmath, hu2025reinforce++, yu2025dapo, zheng2025group}. Yet, the characteristics of the environment determine which specific capabilities of an LLM can be elicited. 
+Specifically, environments based on mathematics and code focus on guiding general logical reasoning, but are difficult to scale due to their reliance on expensive expert annotations \citep{cobbe2021training, lightman2023let}. In contrast, game-based environments tend to cultivate task-oriented planning abilities, but the skills learned are often too specialized to generalize well \citep{carta2023grounding, tan2024true, wen2024reinforcing}. 
+While concurrent work has begun to explore the construction of LLM reasoning environments from the perspectives of tool use, symbolic reasoning, and NP-hard graph problems \citep{fang2025towards, lacombe2025reasoning, wang2025graph}, a formal definition of an ideal environment is lacking. An ideal LLM reasoning environment should possess three key attributes: scalability, generalizable reasoning, and verifiability. 
+Therefore, we propose the automated construction of reasoning environments from structured data that satisfy these three attributes and the use of RL fine-tuning to efficiently elicit the reasoning capabilities of LLMs. 
+
+\subsection{Promoting LLM Structured Reasoning}
+Despite notable advancements in mathematical and code reasoning \citep{zeng2025simplerl, chen2025r1}, LLMs still perform poorly on structured reasoning tasks that depend on external structured knowledge. 
+Existing research to enhance the structured reasoning of LLMs falls mainly into two categories: task decomposition-based prompt engineering and supervised learning-based reasoning distillation. The former uses meticulously designed prompts to guide LLMs in exploring external knowledge bases with tools, gathering relevant structured knowledge to answer questions \citep{sun2023think, chen2024plan, tan2025paths}. The latter distills reasoning chains from supporting structured knowledge, using either rule-based methods or more powerful LLMs, and then enhances the structured reasoning abilities of LLMs through supervised fine-tuning \citep{luo2023reasoning, wu2025medreason, dedhia2025bottom}. 
+However, the reasoning skills learned through these methods are typically relatively specialized and rigid, struggling to generalize to dynamic structured reasoning domains. 
+In light of this, we formulate structured reasoning tasks as a structured in-context environment and employ RL training to effectively elicit generalizable structured reasoning capabilities. 
+
+\section{More Experimental Results}
+
+\subsection{Full In-domain and OOD Evaluations}
+
+\label{appdx:b}
+We report the complete experimental results for four representative LLMs, Qwen2.5-7B-Instruct, Llama3.1-8B-Instruct, Qwen2.5-7B, and Qwen3-8B, across five partial SIE settings that retain 100\%, 75\%, 50\%, 25\%, and 0\% of supporting triples (SIE-100\% to SIE-0\%). The fine-tuning approaches compared include a training-free Chain-of-Thought prompt (CoT), supervised fine-tuning on distilled structured reasoning data (SFT w/ SRD), and our environment-driven RL fine-tuning (RL w/ SIE); we also report the DeepSeek-R1 baseline. \Cref{tab:performance_comparison_final_corrected} summarizes performance and relative gains on structured reasoning (SIE-driven KGQA), while \Cref{tab:comprehensive_results_111} shows out-of-domain (OOD) generalization gains on mathematical and logical reasoning benchmarks. The overall pattern is clear: \textit{RL w/ SIE substantially outperforms both CoT and SFT w/ SRD across all SIE configurations, and even under the most information-scarce setting (SIE-0\%) RL fine-tuning still yields meaningful improvements}. Although SFT w/ SRD can enhance long-form reasoning behaviors and sometimes aids cross-domain transfer, its aggregate gains are smaller than those achieved by in-context RL exploration. These results also illustrate the gradual degradation of performance as the structured in-context information is removed and highlight relative robustness differences among models, providing empirical support for the claim that SIE-driven RL encourages exploratory compositional reasoning under information constraints.
+
+\Cref{tab:performance_comparison_final_corrected} shows a consistent and striking pattern across models and KGQA benchmarks: RL fine-tuning within the SIE (RL w/ SIE) delivers far larger gains than either CoT prompting or supervised fine-tuning on distilled SRD. For Qwen2.5-7B-Instruct and Llama3.1-8B-Instruct, RL w/ SIE yields very high accuracy scores on WebQSP ($\sim 93.4$ and $93.2$ at SIE-100\%), CWQ ($\sim 87.7$ and $89.7$), and GrailQA ($\sim 85.8$ and $85.0$), substantially outperforming SFT w/ SRD (which typically improves scores by $\sim 6-16$ points over CoT) and the CoT baseline itself. The gains produced by RL w/ SIE are also robust across the partial-SIE spectrum: although absolute accuracy declines as support triples are removed (SIE-100\% $\rightarrow$ SIE-0\%), RL w/ SIE maintains pronounced advantages even in the most information-scarce settings (e.g., WebQSP SIE-0\%: RL still $72.8$ for Qwen2.5-7B-Instruct vs. CoT $17.8$). For Qwen2.5-7B and Qwen3-8B, a similar trend emerges: RL w/ SIE produces very large relative improvements (often raising weak CoT baselines into strong performance ranges), while SFT w/ SRD yields substantial but smaller improvements. The DeepSeek-R1 baseline generally sits between SFT and RL in absolute performance for many settings, illustrating that the SIE-driven KGQA task still poses a certain level of difficulty even for powerful LLMs. Overall, The results demonstrates that SIE-enabled RL exploration is a far more effective mechanism for eliciting high-quality structured reasoning than passive supervision or prompting alone.
+
+\begin{table*}[t]
+\centering
+\caption{Structured reasoning performance after RL fine-tuning in partial SIEs.}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{l|l|ccc|ccc|c}
+\hline
+\multicolumn{2}{c|}{\textbf{}} & \multicolumn{3}{c|}{\textbf{Qwen2.5-7B-Instruct}} & \multicolumn{3}{c|}{\textbf{Llama3.1-8B-Instruct}} & \textbf{LLM API} \\
+\hline
+\textbf{Datasets} & \textbf{Settings} & \textbf{CoT} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{CoT} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{DeepSeek-R1} \\
+\hline
+\multirow{6}{*}{\textbf{WebQSP}} 
+& SIE-100\% & 26.3 & 40.5 (\textcolor{red}{+14.2}) & 93.4 (\textcolor{red}{+67.1}) & 36.5 & 43.4 (\textcolor{red}{+6.9}) & 93.2 (\textcolor{red}{+56.7}) & 86.3 \\
+& SIE-75\% & 23.6 & 38.9 (\textcolor{red}{+15.3}) & 89.2 (\textcolor{red}{+65.6}) & 33.8 & 43.1 (\textcolor{red}{+9.3}) & 90.4 (\textcolor{red}{+56.6}) & 85.6 \\
+& SIE-50\% & 22.3 & 36.7 (\textcolor{red}{+14.4}) & 86.4 (\textcolor{red}{+64.1}) & 31.1 & 40.8 (\textcolor{red}{+9.7}) & 89.4 (\textcolor{red}{+58.3}) & 83.3 \\
+& SIE-25\% & 22.0 & 36.9 (\textcolor{red}{+14.9}) & 85.4 (\textcolor{red}{+63.4}) & 31.5 & 40.0 (\textcolor{red}{+8.5}) & 86.8 (\textcolor{red}{+55.3}) & 83.6 \\
+& SIE-0\% & 17.8 & 28.2 (\textcolor{red}{+10.4}) & 72.8 (\textcolor{red}{+55.0}) & 26.1 & 34.6 (\textcolor{red}{+8.5}) & 75.1 (\textcolor{red}{+49.0}) & 78.1 \\
+& w/o Context & 2.0 & 13.6 (\textcolor{red}{+11.6}) & 59.7 (\textcolor{red}{+57.7}) & 15.1 & 15.4 (\textcolor{red}{+0.3}) & 61.3 (\textcolor{red}{+46.2}) & 66.3 \\
+\hline
+\multirow{6}{*}{\textbf{CWQ}} 
+& SIE-100\% & 34.4 & 43.3 (\textcolor{red}{+8.9}) & 87.7 (\textcolor{red}{+53.3}) & 37.2 & 49.5 (\textcolor{red}{+12.3}) & 89.7 (\textcolor{red}{+52.5}) & 76.2 \\
+& SIE-75\% & 33.0 & 39.5 (\textcolor{red}{+6.5}) & 83.6 (\textcolor{red}{+50.6}) & 35.3 & 47.1 (\textcolor{red}{+11.8}) & 86.9 (\textcolor{red}{+51.6}) & 74.3 \\
+& SIE-50\% & 29.8 & 35.4 (\textcolor{red}{+5.6}) & 78.2 (\textcolor{red}{+48.4}) & 33.2 & 41.9 (\textcolor{red}{+8.7}) & 83.4 (\textcolor{red}{+50.2}) & 70.8 \\
+& SIE-25\% & 29.3 & 33.3 (\textcolor{red}{+4.0}) & 73.8 (\textcolor{red}{+44.5}) & 31.2 & 40.6 (\textcolor{red}{+9.4}) & 78.9 (\textcolor{red}{+47.7}) & 68.3 \\
+& SIE-0\% & 24.2 & 28.9 (\textcolor{red}{+4.7}) & 56.1 (\textcolor{red}{+31.9}) & 26.6 & 34.5 (\textcolor{red}{+7.9}) & 60.6 (\textcolor{red}{+34.0}) & 62.1 \\
+& w/o Context & 8.2 & 15.5 (\textcolor{red}{+7.3}) & 36.7 (\textcolor{red}{+28.5}) & 14.8 & 18.0 (\textcolor{red}{+3.2}) & 39.7 (\textcolor{red}{+24.9}) & 46.7 \\
+\hline
+\multirow{6}{*}{\textbf{GrailQA}} 
+& SIE-100\% & 40.5 & 55.7 (\textcolor{red}{+15.2}) & 85.8 (\textcolor{red}{+45.3}) & 43.6 & 60.0 (\textcolor{red}{+16.4}) & 85.0 (\textcolor{red}{+41.4}) & 86.8 \\
+& SIE-75\% & 39.9 & 57.4 (\textcolor{red}{+17.5}) & 84.1 (\textcolor{red}{+44.2}) & 43.5 & 59.1 (\textcolor{red}{+15.6}) & 83.8 (\textcolor{red}{+40.3}) & 86.3 \\
+& SIE-50\% & 39.3 & 53.6 (\textcolor{red}{+14.3}) & 81.7 (\textcolor{red}{+42.4}) & 44.3 & 57.8 (\textcolor{red}{+13.5}) & 82.7 (\textcolor{red}{+38.4}) & 85.5 \\
+& SIE-25\% & 37.7 & 52.9 (\textcolor{red}{+15.2}) & 78.9 (\textcolor{red}{+41.2}) & 43.4 & 56.9 (\textcolor{red}{+13.5}) & 81.6 (\textcolor{red}{+38.2}) & 84.1 \\
+& SIE-0\% & 33.8 & 49.5 (\textcolor{red}{+15.7}) & 71.5 (\textcolor{red}{+37.7}) & 38.6 & 56.2 (\textcolor{red}{+17.6}) & 72.9 (\textcolor{red}{+34.3}) & 83.4 \\
+& w/o Context & 1.9 & 6.9 (\textcolor{red}{+5.0}) & 20.8 (\textcolor{red}{+18.9}) & 5.9 & 9.2 (\textcolor{red}{+3.3}) & 24.9 (\textcolor{red}{+19.0}) & 37.8 \\
+\hline
+\hline
+\multicolumn{2}{c|}{\textbf{}} & \multicolumn{3}{c|}{\textbf{Qwen2.5-7B}} & \multicolumn{3}{c|}{\textbf{Qwen3-8B (Pretraining \& Post-training)}} & \textbf{LLM API} \\
+\hline
+\textbf{Datasets} & \textbf{Settings} & \textbf{CoT} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{CoT} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{DeepSeek-R1} \\
+\hline
+\multirow{6}{*}{\textbf{WebQSP}} 
+& SIE-100\% & 2.6 & 39.8 (\textcolor{red}{+37.2}) & 93.2 (\textcolor{red}{+90.6}) & 47.8 & 43.6 (\textcolor{green}{-4.2}) & 90.2 (\textcolor{red}{+42.4}) & 86.3 \\
+& SIE-75\% & 2.0 & 38.3 (\textcolor{red}{+36.3}) & 90.2 (\textcolor{red}{+88.2}) & 47.3 & 42.0 (\textcolor{green}{-5.3}) & 88.0 (\textcolor{red}{+40.7}) & 85.6 \\
+& SIE-50\% & 2.5 & 36.8 (\textcolor{red}{+34.3}) & 87.2 (\textcolor{red}{+84.7}) & 44.9 & 42.3 (\textcolor{green}{-2.6}) & 84.0 (\textcolor{red}{+39.1}) & 83.3 \\
+& SIE-25\% & 1.6 & 36.9 (\textcolor{red}{+35.3}) & 85.8 (\textcolor{red}{+84.2}) & 44.8 & 41.9 (\textcolor{green}{-2.9}) & 82.6 (\textcolor{red}{+37.8}) & 83.6 \\
+& SIE-0\% & 1.7 & 29.2 (\textcolor{red}{+27.5}) & 73.4 (\textcolor{red}{+71.7}) & 36.7 & 35.3 (\textcolor{green}{-1.4}) & 70.8 (\textcolor{red}{+34.1}) & 78.1 \\
+& w/o Context & 9.7 & 13.8 (\textcolor{red}{+4.1}) & 62.8 (\textcolor{red}{+53.1}) & 12.3 & 13.0 (\textcolor{red}{+0.7}) & 48.6 (\textcolor{red}{+36.3}) & 66.3 \\
+\hline
+\multirow{6}{*}{\textbf{CWQ}} 
+& SIE-100\% & 3.2 & 43.1 (\textcolor{red}{+39.9}) & 89.3 (\textcolor{red}{+86.1}) & 48.6 & 51.5 (\textcolor{red}{+2.9}) & 78.6 (\textcolor{red}{+30.0}) & 76.2 \\
+& SIE-75\% & 3.1 & 39.8 (\textcolor{red}{+36.7}) & 85.3 (\textcolor{red}{+82.2}) & 46.6 & 47.6 (\textcolor{red}{+1.0}) & 75.2 (\textcolor{red}{+28.6}) & 74.3 \\
+& SIE-50\% & 2.7 & 34.5 (\textcolor{red}{+31.8}) & 79.9 (\textcolor{red}{+77.2}) & 42.9 & 45.3 (\textcolor{red}{+2.4}) & 67.9 (\textcolor{red}{+25.0}) & 70.8 \\
+& SIE-25\% & 2.4 & 33.2 (\textcolor{red}{+30.8}) & 75.1 (\textcolor{red}{+72.7}) & 41.1 & 43.8 (\textcolor{red}{+2.7}) & 66.9 (\textcolor{red}{+25.8}) & 68.3 \\
+& SIE-0\% & 2.2 & 28.4 (\textcolor{red}{+26.2}) & 58.1 (\textcolor{red}{+55.9}) & 35.6 & 36.4 (\textcolor{red}{+0.8}) & 55.9 (\textcolor{red}{+20.3}) & 62.1 \\
+& w/o Context & 11.4 & 15.6 (\textcolor{red}{+4.2}) & 38.4 (\textcolor{red}{+27.0}) & 16.8 & 16.3 (\textcolor{green}{-0.5}) & 29.7 (\textcolor{red}{+12.9}) & 46.7 \\
+\hline
+\multirow{6}{*}{\textbf{GrailQA}} 
+& SIE-100\% & 13.2 & 51.6 (\textcolor{red}{+38.4}) & 81.5 (\textcolor{red}{+68.3}) & 67.5 & 64.0 (\textcolor{green}{-3.5}) & 85.1 (\textcolor{red}{+17.6}) & 86.8 \\
+& SIE-75\% & 15.4 & 53.7 (\textcolor{red}{+38.3}) & 81.1 (\textcolor{red}{+65.7}) & 67.7 & 63.3 (\textcolor{green}{-4.4}) & 84.7 (\textcolor{red}{+17.0}) & 86.3 \\
+& SIE-50\% & 14.2 & 50.7 (\textcolor{red}{+36.5}) & 80.1 (\textcolor{red}{+65.9}) & 65.9 & 63.2 (\textcolor{green}{-2.7}) & 83.0 (\textcolor{red}{+17.1}) & 85.5 \\
+& SIE-25\% & 13.6 & 51.6 (\textcolor{red}{+38.0}) & 79.0 (\textcolor{red}{+65.4}) & 66.3 & 62.1 (\textcolor{green}{-4.2}) & 82.1 (\textcolor{red}{+15.8}) & 84.1 \\
+& SIE-0\% & 15.5 & 46.4 (\textcolor{red}{+30.9}) & 72.1 (\textcolor{red}{+56.6}) & 64.5 & 60.6 (\textcolor{green}{-3.9}) & 77.6 (\textcolor{red}{+13.1}) & 83.4 \\
+& w/o Context & 3.4 & 6.3 (\textcolor{red}{+2.9}) & 19.5 (\textcolor{red}{+16.1}) & 10.6 & 8.7 (\textcolor{green}{-1.9}) & 21.8 (\textcolor{red}{+11.2}) & 37.8 \\
+\hline
+\end{tabular}%
+}
+\label{tab:performance_comparison_final_corrected}
+\end{table*}
+
+\Cref{tab:comprehensive_results_111} demonstrates that the compositional strategies learned via RL w/ SIE transfer strongly to out-of-domain math and logic tasks. For Qwen2.5-7B-Instruct, RL w/ SIE achieves $\sim 87.4$ on GSM8K and $\sim 61.6$ on MATH500 at SIE-100\%, substantially exceeding SFT w/ SRD ($\sim 68.1$ and $54.8$) and CoT ($29.2$ and $43.0$). This pattern holds across different partial SIE levels: RL w/ SIE maintains high GSM8K accuracy ($\sim 86-88$) and yields consistent improvements on MATH500 and the Knights \& Knaves subsets (KK-easy, KK-hard). Llama3.1-8B-Instruct shows the same qualitative trend that RL w/ SIE improves GSM8K and logical-task performance over SFT, though absolute magnitudes vary by model and dataset. For Qwen2.5-7B and Qwen3-8B, RL w/ SIE similarly produces strong OOD gains, often moving models from modest CoT baselines into substantially higher-performance regimes. Notably, SFT w/ SRD sometimes produces competitive or even superior results on certain math splits for particular models (reflecting that distilled long-form reasoning can benefit arithmetic tasks), but on average the RL w/ SIE condition yields larger and more consistent cross-domain gains. Together, the numbers indicate that SIE-driven RL induces compositional reasoning behaviors that generalize beyond the structured environment.
+
+
+
+
+\begin{table}[t!]
+\centering
+\caption{Out-of-domain generalization performance after RL fine-tuning in partial SIEs.}
+\label{tab:comprehensive_results_111}
+% 使用 resizebox 将表格宽度缩放到文本宽度
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{l cc cc cc cc}
+\toprule
+% --- 表格 1: Qwen2.5-7B-Instruct ---
+\multicolumn{9}{c}{\large\textbf{Qwen2.5-7B-Instruct}} \\
+\midrule
+& \multicolumn{2}{c}{\textbf{GSM8K (29.2\%)}} & \multicolumn{2}{c}{\textbf{MATH500 (43.0\%)}} & \multicolumn{2}{c}{\textbf{KK-easy (42.0\%)}} & \multicolumn{2}{c}{\textbf{KK-hard (19.5\%)}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+\textbf{Settings} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} \\
+\midrule
+SIE-100\% & 68.1 \posgain{38.9} & 87.4 \posgain{58.2} & 54.8 \posgain{11.8} & 61.6 \posgain{18.6} & 41.5 \neggain{0.5} & 49.5 \posgain{7.5} & 21.5 \posgain{2.0} & 29.0 \posgain{9.5} \\
+SIE-75\% & 63.3 \posgain{34.1} & 87.7 \posgain{58.5} & 54.0 \posgain{11.0} & 61.0 \posgain{18.0} & 39.5 \neggain{2.5} & 50.0 \posgain{8.0} & 24.5 \posgain{5.0} & 26.0 \posgain{6.5} \\
+SIE-50\% & 68.7 \posgain{39.5} & 86.2 \posgain{57.0} & 55.2 \posgain{12.2} & 59.0 \posgain{16.0} & 47.0 \posgain{5.0} & 48.5 \posgain{6.5} & 23.5 \posgain{4.0} & 25.5 \posgain{6.0} \\
+SIE-25\%       & 63.9 \posgain{34.7} & 86.0 \posgain{56.8} & 52.0 \posgain{9.0} & 60.2 \posgain{17.2} & 46.0 \posgain{4.0} & 48.0 \posgain{6.0} & 28.5 \posgain{9.0} & 24.5 \posgain{5.0} \\
+SIE-0\%       & 63.9 \posgain{34.7} & 87.1 \posgain{57.9} & 52.0 \posgain{9.0} & 58.0 \posgain{15.0} & 45.0 \posgain{3.0} & 47.0 \posgain{5.0} & 21.0 \posgain{1.5} & 23.0 \posgain{3.5} \\
+w/o Context & 69.3 \posgain{40.1} & 84.6 \posgain{55.4} & 51.2 \posgain{8.2} & 60.4 \posgain{17.4} & 48.5 \posgain{6.5} & 47.5 \posgain{5.5} & 27.0 \posgain{7.5} & 25.0 \posgain{5.5} \\
+\midrule[1.5pt] % 加粗的分割线
+% --- 表格 2: Llama3.1-8B-Instruct ---
+\multicolumn{9}{c}{\large\textbf{Llama3.1-8B-Instruct}} \\
+\midrule
+& \multicolumn{2}{c}{\textbf{GSM8K (67.4\%)}} & \multicolumn{2}{c}{\textbf{MATH500 (38.4\%)}} & \multicolumn{2}{c}{\textbf{KK-easy (20.5\%)}} & \multicolumn{2}{c}{\textbf{KK-hard (6.0\%)}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+\textbf{Settings} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} \\
+\midrule
+SIE-100\% & 73.6 \posgain{6.2} & 82.6 \posgain{15.2} & 42.0 \posgain{3.6} & 47.0 \posgain{8.6} & 8.5 \neggain{12.0} & 37.0 \posgain{16.5} & 1.5 \neggain{4.5} & 15.5 \posgain{9.5}  \\
+SIE-75\% & 78.1 \posgain{10.7} & 81.4 \posgain{14.0} & 41.4 \posgain{3.0} & 47.2 \posgain{8.8} & 15.0 \neggain{5.5} & 38.5 \posgain{18.0} & 6.0 \posgain{0.0} & 17.5 \posgain{11.5} \\
+SIE-50\% & 75.2 \posgain{7.8} & 81.7 \posgain{14.3} & 40.4 \posgain{2.0} & 46.4 \posgain{8.0} & 13.0 \neggain{7.5} & 35.0 \posgain{14.5} & 1.0 \neggain{5.0} & 14.0 \posgain{8.0}  \\
+SIE-25\%       & 77.5 \posgain{10.1} & 81.0 \posgain{13.6} & 43.4 \posgain{5.0} & 46.6 \posgain{8.2} & 9.0 \neggain{11.5} & 36.0 \posgain{15.5} & 1.5 \neggain{4.5} & 12.5 \posgain{6.5}  \\
+SIE-0\%       & 77.1 \posgain{9.7} & 81.2 \posgain{13.8} & 41.8 \posgain{3.4} & 45.8 \posgain{7.4} & 10.5 \neggain{10.0} & 38.5 \posgain{18.0} & 2.0 \neggain{4.0} & 14.5 \posgain{8.5}  \\
+w/o Context & 75.1 \posgain{7.7} & 77.2 \posgain{9.8}  & 44.8 \posgain{6.4} & 43.4 \posgain{5.0} & 25.0 \posgain{4.5} & 35.5 \posgain{15.0} & 5.0 \neggain{1.0} & 12.5 \posgain{6.5}  \\
+\midrule[1.5pt] % 加粗的分割线
+% --- 表格 3: Qwen2.5-7B ---
+\multicolumn{9}{c}{\large\textbf{Qwen2.5-7B}} \\
+\midrule
+& \multicolumn{2}{c}{\textbf{GSM8K (27.0\%)}} & \multicolumn{2}{c}{\textbf{MATH500 (30.2\%)}} & \multicolumn{2}{c}{\textbf{KK-easy (37.5\%)}} & \multicolumn{2}{c}{\textbf{KK-hard (15.5\%)}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+\textbf{Settings} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} \\
+\midrule
+SIE-100\% & 73.9 \posgain{46.9} & 86.2 \posgain{59.2} & 54.6 \posgain{24.4} & 59.2 \posgain{29.0} & 44.0 \posgain{6.5} & 52.0 \posgain{14.5} & 25.0 \posgain{9.5} & 27.5 \posgain{12.0} \\
+SIE-75\% & 71.8 \posgain{44.8} & 86.6 \posgain{59.6} & 52.6 \posgain{22.4} & 57.4 \posgain{27.2} & 39.5 \posgain{2.0} & 51.5 \posgain{14.0} & 25.0 \posgain{9.5} & 26.0 \posgain{10.5} \\
+SIE-50\% & 72.0 \posgain{45.0} & 85.9 \posgain{58.9} & 53.2 \posgain{23.0} & 57.8 \posgain{27.6} & 38.0 \posgain{0.5} & 51.0 \posgain{13.5} & 25.0 \posgain{9.5} & 27.5 \posgain{12.0} \\
+SIE-25\%       & 68.8 \posgain{41.8} & 87.7 \posgain{60.7} & 51.2 \posgain{21.0} & 58.8 \posgain{28.6} & 37.0 \neggain{0.5} & 51.5 \posgain{14.0} & 24.5 \posgain{9.0} & 29.5 \posgain{14.0} \\
+SIE-0\%       & 68.2 \posgain{41.2} & 85.9 \posgain{58.9} & 53.6 \posgain{23.4} & 56.8 \posgain{26.6} & 34.5 \neggain{3.0} & 53.5 \posgain{16.0} & 19.5 \posgain{4.0} & 28.5 \posgain{13.0} \\
+w/o Context & 68.0 \posgain{41.0} & 86.4 \posgain{59.4} & 52.0 \posgain{21.8} & 55.2 \posgain{25.0} & 46.0 \posgain{8.5} & 50.0 \posgain{12.5} & 22.5 \posgain{7.0} & 28.0 \posgain{12.5} \\
+\midrule[1.5pt] % 加粗的分割线
+% --- 表格 4: Qwen3-8B (Pretraining & Post-training) ---
+\multicolumn{9}{c}{\large\textbf{Qwen3-8B (Pretraining \& Post-training)}} \\
+\midrule
+& \multicolumn{2}{c}{\textbf{GSM8K (71.1\%)}} & \multicolumn{2}{c}{\textbf{MATH500 (20.4\%)}} & \multicolumn{2}{c}{\textbf{KK-easy (79.5\%)}} & \multicolumn{2}{c}{\textbf{KK-hard (59.5\%)}} \\
+\cmidrule(lr){2-3} \cmidrule(lr){4-5} \cmidrule(lr){6-7} \cmidrule(lr){8-9}
+\textbf{Settings} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} & \textbf{SFT w/ SRD} & \textbf{RL w/ SIE} \\
+\midrule
+SIE-100\% & 78.4 \posgain{7.3} & 91.9 \posgain{20.8} & 40.8 \posgain{20.4} & 36.6 \posgain{16.2} & 83.0 \posgain{3.5} & 90.0 \posgain{10.5} & 66.0 \posgain{6.5} & 73.5 \posgain{14.0} \\
+SIE-75\% & 77.5 \posgain{6.4} & 93.1 \posgain{22.0} & 39.4 \posgain{19.0} & 38.0 \posgain{17.6} & 88.0 \posgain{8.5} & 95.5 \posgain{16.0} & 68.5 \posgain{9.0} & 77.5 \posgain{18.0} \\
+SIE-50\% & 78.6 \posgain{7.5} & 89.4 \posgain{18.3} & 40.4 \posgain{20.0} & 36.8 \posgain{16.4} & 84.5 \posgain{5.0} & 89.0 \posgain{9.5} & 67.0 \posgain{7.5} & 73.0 \posgain{13.5} \\
+SIE-25\%       & 79.5 \posgain{8.4} & 93.9 \posgain{22.8} & 37.6 \posgain{17.2} & 46.6 \posgain{26.2} & 86.0 \posgain{6.5} & 93.5 \posgain{14.0} & 67.5 \posgain{8.0} & 78.5 \posgain{19.0} \\
+SIE-0\%       & 79.1 \posgain{8.0} & 93.4 \posgain{22.3} & 40.6 \posgain{20.2} & 44.6 \posgain{24.2} & 85.5 \posgain{6.0} & 94.5 \posgain{15.0} & 64.5 \posgain{5.0} & 80.0 \posgain{20.5} \\
+w/o Context & 83.5 \posgain{12.4} & 90.2 \posgain{19.1} & 40.6 \posgain{20.2} & 35.7 \posgain{15.3} & 94.0 \posgain{14.5} & 89.5 \posgain{10.0} & 72.5 \posgain{13.0} & 67.5 \posgain{8.0}  \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+
+\subsection{Generalization on Hard Math and Tabular Tasks}
+\label{app:aime_tabmwp}
+
+
+\textbf{RL w/ SIE Demonstrates Strong Generalization on Olympiad-Level Math and Tabular Data.}
+To verify whether the learned strategies generalize to scarce-signal and highly challenging regimes, we evaluated our method on AIME 2024 (an Olympiad-level math benchmark) and TabMWP \citep{lu2022dynamic} (a table-based structured QA dataset).
+\Cref{tab:aime_tabmwp} reports the results for Qwen2.5-7B and Llama3.1-8B-Instruct.
+On AIME 2024, our method demonstrates stable performance advantages over the CoT baseline as $k$ increases (e.g., Qwen2.5-7B pass@8 improves from 9.22 to 19.41). This indicates that models trained within SIE possess stronger exploration capabilities and robustness when dealing with complex, multi-step reasoning tasks.
+Moreover, on TabMWP, our method achieves substantial performance improvements in the zero-shot setting (e.g., +36.3\% for Qwen and +7.5\% for Llama). This confirms that the reasoning capabilities cultivated by the SIE framework are not limited to KG structures but can effectively transfer to heterogeneous structured data like tables.
+
+
+\begin{table}[!t]
+\centering
+\caption{Evaluation on AIME 2024 and TabMWP. RL w/ SIE significantly improves pass@k on the hard math benchmark and demonstrates strong zero-shot transfer capabilities to tabular data.}
+\vspace{5pt}
+\label{tab:aime_tabmwp}
+\scalebox{0.85}{
+\begin{tabular}{lccccc}
+\toprule
+\textbf{Methods} & \textbf{\begin{tabular}[c]{@{}c@{}}AIME 24\\ pass@1\end{tabular}} & \textbf{\begin{tabular}[c]{@{}c@{}}AIME 24\\ pass@2\end{tabular}} & \textbf{\begin{tabular}[c]{@{}c@{}}AIME 24\\ pass@4\end{tabular}} & \textbf{\begin{tabular}[c]{@{}c@{}}AIME 24\\ pass@8\end{tabular}} & \textbf{\begin{tabular}[c]{@{}c@{}}TabMWP\\ accuracy\end{tabular}} \\
+\midrule
+\multicolumn{6}{l}{\textit{Qwen2.5-7B (Base)}} \\
+\quad + CoT & 2.29 & 3.97 & 6.27 & 9.22 & 45.5 \\
+\quad + RL w/ SIE-100\% & \textbf{6.25} & \textbf{10.31} & \textbf{15.02} & \textbf{19.41} & \textbf{81.8} \\
+\midrule
+\multicolumn{6}{l}{\textit{Llama3.1-8B-Instruct}} \\
+\quad + CoT & 3.12 & 4.97 & 7.31 & 10.89 & 69.5 \\
+\quad + RL w/ SIE-100\% & \textbf{4.58} & \textbf{7.81} & \textbf{12.12} & \textbf{17.30} & \textbf{77.0} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Ablation Study on Distractor Rerankers}
+\label{app:reranker}
+
+
+\textbf{The Semantic Reranker Balances Difficulty and Generalization, while Structural Similarity Leads to Shortcut Learning.}
+To verify the necessity and safety of our semantic reranking strategy, we compared it with two baselines: \textit{Random Reranker} (randomly retaining distractor triples) and \textit{Structure Reranker} (retaining triples selected through rule-based heuristics that prioritize structural similarity to the supporting subgraph or the presence of entity or relation mentions.). All experiments were conducted with the Qwen2.5-7B-Instruct + RL w/ SIE-100\% setting.
+As shown in \Cref{tab:reranker_ablation}, the \textit{Semantic Reranker} achieves the best overall performance, particularly in terms of generalization.
+While the \textit{Random Reranker} yields comparable results on most tasks, it exhibits a notable decline on the challenging KK-hard logic benchmark (26.5\% vs. 29.0\%), suggesting that random distractors may lack sufficient relevance to establish a challenging reasoning boundary.
+Conversely, the \textit{Structure Reranker} achieves the highest in-domain scores (e.g., 94.9\% on WebQSP) but suffers from the poorest generalization (e.g., dropping to 24.5\% on KK-hard). This suggests that overly structure-similar distractors can push the model to rely on superficial structural shortcuts instead of cultivating true exploration abilities, ultimately impairing its generalization.
+
+
+\begin{table}[!t]
+\centering
+\caption{Ablation study on different reranking strategies for distractor subgraphs. The semantic reranker provides the optimal trade-off between in-domain performance and OOD generalization.}
+\vspace{5pt}
+\label{tab:reranker_ablation}
+\scalebox{0.85}{
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Methods} & \textbf{WebQSP} & \textbf{CWQ} & \textbf{GrailQA} & \textbf{GSM8K} & \textbf{MATH500} & \textbf{KK-easy} & \textbf{KK-hard} \\
+\midrule
+Semantic Reranker & 93.4 & 87.8 & \textbf{85.8} & \textbf{87.4} & \textbf{61.6} & \textbf{49.5} & \textbf{29.0} \\
+Random Reranker & 93.2 & 87.6 & 84.6 & 87.0 & 61.4 & 49.5 & 26.5 \\
+Structure Reranker & \textbf{94.9} & \textbf{91.2} & 83.8 & 87.1 & 60.2 & 47.0 & 24.5 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+
+\subsection{Scalability to Larger Models}
+\label{app:scalability}
+
+
+\textbf{The SIE Framework Scales Effectively to Larger Model Sizes.}
+To investigate the scalability of our approach, we applied the SIE framework to the larger \textit{Qwen2.5-14B-Instruct} model and compared it with the 7B version.
+\Cref{tab:scale_comparison} demonstrates that the 14B model achieves superior results under the RL w/ SIE-100\% setting across all in-domain and out-of-domain tasks compared to the 7B model (e.g., MATH500 improves from 61.6\% to 75.0\%, and KK-hard improves from 29.0\% to 45.5\%).
+These consistent improvements confirm that the SIE framework is not limited to smaller models but can effectively scale to enhance the reasoning capabilities of larger foundational models.
+
+
+\begin{table}[!t]
+\centering
+\caption{Comparison of performance between Qwen2.5-7B-Instruct and Qwen2.5-14B-Instruct. The 14B model achieves consistent gains, demonstrating the scalability of the SIE framework.}
+\vspace{5pt}
+\label{tab:scale_comparison}
+\scalebox{0.85}{
+\begin{tabular}{lccccccc}
+\toprule
+\textbf{Methods} & \textbf{WebQSP} & \textbf{CWQ} & \textbf{GrailQA} & \textbf{GSM8K} & \textbf{MATH500} & \textbf{KK-easy} & \textbf{KK-hard} \\
+\midrule
+\multicolumn{8}{l}{\textit{Qwen2.5-7B-Instruct}} \\
+\quad + CoT & 26.3 & 34.4 & 40.5 & 29.2 & 43.0 & 42.0 & 19.5 \\
+\quad + RL w/ SIE-100\% & 93.4 & 87.8 & 85.8 & 87.4 & 61.6 & 49.5 & 29.0 \\
+\midrule
+\multicolumn{8}{l}{\textit{Qwen2.5-14B-Instruct}} \\
+\quad + CoT & 40.9 & 48.0 & 65.6 & 72.1 & 62.4 & 60.5 & 35.0 \\
+\quad + RL w/ SIE-100\% & \textbf{94.0} & \textbf{89.9} & \textbf{87.4} & \textbf{91.1} & \textbf{75.0} & \textbf{66.0} & \textbf{45.5} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+\subsection{Comparison with Tool-using Agents}
+\label{app:tog_comparison}
+
+
+\textbf{RL w/ SIE Internalizes Reasoning Capabilities, Outperforming Tool-using Agents on Small Models.}
+We compared our method with \textit{Think-on-Graph (ToG)} \citep{sun2023think}, a representative tool-using agent approach that utilizes structured data as external tools and context.
+As shown in \Cref{tab:tog_comparison}, the ToG method relies heavily on the model's intrinsic instruction-following and planning capabilities. While it performs well with GPT-3.5 and GPT-4, it fails significantly with 7B-scale models (e.g., Qwen2.5-7B-Instruct + ToG achieves only 32.1\% on WebQSP).
+In contrast, our RL w/ SIE method enables the 7B model to achieve a qualitative leap in structured reasoning. Remarkably, even in partial environments like \textit{SIE-50\%} (retaining only 50\% supporting facts) or \textit{SIE-0\%} (no supporting facts), the RL-trained 7B model outperforms or matches the much larger GPT-3.5 + ToG baseline.
+This compelling evidence demonstrates that the SIE framework transcends conventional context augmentation strategies. Rather than passively relying on retrieved knowledge, it utilizes RL to deeply internalize the complex heuristics of structured exploration and multi-hop logical deduction directly into the model's parameters. By transforming these external reasoning trajectories into intrinsic cognitive capabilities, SIE effectively overcomes the inherent planning bottlenecks of smaller models, empowering them to autonomously perform complex structured reasoning.
+
+
+\begin{table}[!t]
+\centering
+\caption{Comparison with Tool-using Agents. The results for GPT-3.5+ToG and GPT-4+ToG are taken from the original ToG paper. RL w/ SIE significantly outperforms the ToG agent on 7B models and matches GPT-3.5+ToG performance even under information-limited partial SIEs.}
+\vspace{5pt}
+\label{tab:tog_comparison}
+\scalebox{0.85}{
+\begin{tabular}{lccc}
+\toprule
+\textbf{Methods} & \textbf{WebQSP} & \textbf{CWQ} & \textbf{GrailQA} \\
+\midrule
+\multicolumn{4}{l}{\textit{Qwen2.5-7B-Instruct}} \\
+\quad + SIE-100\% + CoT & 26.3 & 34.4 & 40.5 \\
+\quad + RL w/ SIE-100\% & \textbf{93.4} & \textbf{87.8} & \textbf{85.8} \\
+\quad + RL w/ SIE-50\% & 86.4 & 78.2 & 81.7 \\
+\quad + RL w/ SIE-0\% & 72.8 & 56.1 & 71.5 \\
+\quad + ToG & 32.1 & 26.0 & 15.3 \\
+\midrule
+\multicolumn{4}{l}{\textit{Closed-source Models}} \\
+GPT-3.5 + ToG & 76.2 & 57.1 & 68.7 \\
+GPT-4 + ToG & 82.6 & 67.6 & 81.4 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
+
+
+
+\section{Prompts}
+\label{appdx:c}
+
+
+The reasoning prompt for the SIE-based KGQA task is shown below:
+
+
+\begin{tcolorbox}[
+  breakable,
+  colback=gray!10,
+  colframe=gray!60,
+  title=Structured Reasoning Prompt for the SIE Framework,
+  left=6pt,right=6pt,top=4pt,bottom=4pt,
+  fontupper=\normalsize
+]
+
+You are a structured reasoning expert tasked with solving problems step by step. 
+
+You first think about the reasoning process in the mind and then provide the answer. 
+
+The reasoning process and answer should be enclosed within \texttt{<think>} \texttt{</think>} and \texttt{<answer>} \texttt{</answer>} tags, respectively, i.e., \texttt{<think>} reasoning process here \texttt{</think>} \texttt{<answer>} answer here \texttt{</answer>}. 
+
+Given a question and the associated knowledge graph triplets (entity, relation, entity), you are asked to answer the question with these triplets and your own knowledge. 
+
+You can break down the original question into several sub-questions and explore the given knowledge graph to solve them step-by-step. 
+
+If there are multiple possible answers, choose one as the final answer. 
+
+After thinking, when you finally reach a conclusion, clearly state the answer within \texttt{<answer>} \texttt{</answer>} tags, i.e., \texttt{<answer>} answer here \texttt{</answer>}. 
+
+\vspace{2pt}
+
+\textbf{Question}: \{\textit{question}\} 
+
+\textbf{Knowledge Triplets}: \{\textit{knowledge triples}\}
+
+\end{tcolorbox}
+
+
+
+
+\section{Case Studies}
+
+We present case studies that compare the behavior of LLMs before and after RL fine-tuning in the SIE, and we observe that Qwen3-8B has a tendency to produce excessively lengthy responses.
+
+\label{appdx:d}
+
+\begin{tcolorbox}[
+  breakable,
+  colback=gray!10,
+  colframe=gray!60,
+  title=Case study before and after RL fine-tuning in SIE,
+  left=6pt,right=6pt,top=4pt,bottom=4pt,
+  fontupper=\scriptsize
+]
+\textbf{Question}: What is the Angelina Jolie directed movie that is 126 minutes long?
+\vspace{2pt}
+
+\textbf{Response \underline{before RL fine-tuning} in SIE-0\%}:
+
+\texttt{<think>}
+
+The question asks for a movie directed by Angelina Jolie that is 126 minutes long.
+From the knowledge graph, we know that Angelina Jolie directed the movie By the Sea and also directed A Place in Time.
+Another piece of information is that Angelina Jolie produced the movie Unbroken.
+Specifically, we are looking for a movie that is 126 minutes long. From the knowledge graph, it also states that the movie By the Sea is 126 minutes long.
+Therefore, we need to confirm if there are any other movies directed by Angelina Jolie that are also 126 minutes long. From the knowledge graph, there are no other movies directed by Angelina Jolie that are 126 minutes long.
+Thus, the movie directed by Angelina Jolie that is 126 minutes long is By the Sea.
+
+\texttt{</think>}
+
+\texttt{<answer>} 
+
+By the Sea \quad \textcolor{blue}{\textbf{[Wrong Answer!]}}
+
+\texttt{</answer>}
+\vspace{2pt}
+
+\textbf{Response \underline{after RL fine-tuning} in SIE-0\%}:
+
+\texttt{<think>}
+
+Okay, let's tackle this question step by step. The question is asking for a movie directed by Angelina Jolie that is 126 minutes long. 
+First, I need to parse the question. The key parts here are: the movie must be directed by Angelina Jolie, and its runtime is 126 minutes. 
+Looking at the knowledge triplets provided, I need to find movies directed by Angelina Jolie. Let's scan through the triplets for any that mention Angelina Jolie as a director. 
+I see a few entries like Angelina Jolie, film.director.film, Unbroken and Angelina Jolie, film.director.film, A Place in Time and By the Sea, film.film.directed\_by, Angelina Jolie. So, the movies directed by her are Unbroken, A Place in Time, By the Sea, and possibly others. 
+Now, I need to find the runtime of these movies. However, the knowledge triplets provided don't include the runtime information. Wait, but maybe there's another way. The question is asking for a movie that is 126 minutes long. I might need to recall some film runtimes. 
+Unbroken is a movie directed by Angelina Jolie. I remember that Unbroken has a runtime of approximately 127 minutes. That's close to 126, but not exact. Then there's By the Sea, which I think is around 145 minutes. A Place in Time might be shorter, maybe around 100 minutes. 
+Wait, but the question specifies 126 minutes. Since the knowledge triplets don't provide the runtime, I might have to rely on my own knowledge here. Alternatively, maybe there's another movie directed by her that I'm forgetting. 
+Another movie directed by Angelina Jolie is In the Land of Blood and Honey, which I believe has a runtime of 126 minutes. Let me confirm that. Yes, In the Land of Blood and Honey is a film directed by her and has a runtime of 126 minutes. 
+So, the answer would be In the Land of Blood and Honey. Let me check if that movie is listed in the knowledge triplets. Looking through the triplets, I see In the Land of Blood and Honey, film.film.directed\_by, Angelina Jolie and In the Land of Blood and Honey, film.film.produced\_by, Angelina Jolie. So, that's a valid entry. 
+Therefore, the movie is In the Land of Blood and Honey.
+
+\texttt{</think>}
+
+\texttt{<answer>} 
+
+In the Land of Blood and Honey \quad \textcolor{red}{\textbf{[Correct Answer!]}}
+
+\texttt{</answer>}
+
+\end{tcolorbox}
+
+
+
+
+
+
+
+\begin{tcolorbox}[
+  breakable,
+  colback=gray!10,
+  colframe=gray!60,
+  title=Qwen3-8B often generates overly long responses,
+  left=6pt,right=6pt,top=4pt,bottom=4pt,
+  fontupper=\scriptsize
+]
+\textbf{Question}: Find the product of the $y$-coordinates of all the distinct solutions $(x,y)$ for the two equations $y=x^2-8$ and $y^2=-5x+44$.
+\vspace{2pt}
+
+\textbf{Response of Qwen3-8B}:
+
+\texttt{<think>}
+
+Okay, so I need to find the product of the $y$-coordinates of all the distinct solutions $(x, y)$ for the two equations $y = x^2 - 8$ and $y^2 = -5x + 44$. Hmm, let me think about how to approach this.
+
+First, since both equations involve $y$ and $x$, maybe I can substitute one into the other. The first equation gives $y$ in terms of $x$, so maybe I can plug that expression for $y$ into the second equation. Let me try that.
+
+So, substituting $y = x^2 - 8$ into the second equation $y^2 = -5x + 44$, I get:
+\[(x^2 - 8)^2 = -5x + 44.\]
+
+Now, let me expand the left side. $(x^2 - 8)^2$ is $x^4 - 16x^2 + 64$. Wait, let me check that again. $(a - b)^2$ is $a^2 - 2ab + b^2$, so here $a$ is $x^2$ and $b$ is $8$. So, $(x^2)^2$ is $x^4$, then $-2(x^2)(8)$ is $-16x^2$, and then $+8^2$ which is $64$. Yes, so the left side is $x^4 - 16x^2 + 64$.
+
+So the equation becomes:
+\[x^4 - 16x^2 + 64 = -5x + 44.\]
+
+Let me bring all terms to one side to set the equation to zero:
+\[x^4 - 16x^2 + 64 + 5x - 44 = 0.\]
+
+Simplify the constants: $64 - 44$ is $20$. So:
+\[x^4 - 16x^2 + 5x + 20 = 0.\]
+
+Hmm, so now I have a quartic equation: $x^4 - 16x^2 + 5x + 20 = 0$. Solving quartic equations can be complicated, but maybe this factors? Let me try to factor it.
+
+First, let me check for rational roots using the Rational Root Theorem. The possible rational roots are factors of the constant term ($20$) divided by factors of the leading coefficient ($1$), so possible roots are $\pm 1, \pm 2, \pm 4, \pm 5, \pm 10, \pm 20$.
+
+Let me test $x = 1$: $1 - 16 + 5 + 20 = 1 - 16$ is $-15$, $+5$ is $-10$, $+20$ is $10$. Not zero.
+
+$x = -1$: $1 - 16(-1)^2 + 5(-1) + 20$. Wait, $(-1)^2$ is $1$, so $1 - 16 + (-5) + 20 = 1 - 16$ is $-15$, $-5$ is $-20$, $+20$ is $0$. Oh! $x = -1$ is a root. Great!
+
+So, $(x + 1)$ is a factor. Let me perform polynomial division or use synthetic division to factor it out.
+
+Using synthetic division with root $-1$:
+
+Coefficients of the polynomial $x^4 + 0x^3 - 16x^2 + 5x + 20$. Wait, the original polynomial is $x^4 - 16x^2 + 5x + 20$. So, the coefficients are $1$ ($x^4$), $0$ ($x^3$), $-16$ ($x^2$), $5$ ($x$), $20$ (constant).
+
+Set up synthetic division:
+\[
+\begin{array}{c|ccccc}
+-1 & 1 & 0 & -16 & 5 & 20 \\
+ & & -1 & 1 & 15 & -20 \\
+\hline
+ & 1 & -1 & -15 & 20 & 0
+\end{array}
+\]
+
+So, the quotient polynomial is $x^3 - x^2 - 15x + 20$. Therefore, the original polynomial factors as $(x + 1)(x^3 - x^2 - 15x + 20)$.
+
+Now, let's try to factor the cubic polynomial $x^3 - x^2 - 15x + 20$. Again, use the Rational Root Theorem. Possible roots are $\pm 1, \pm 2, \pm 4, \pm 5, \pm 10, \pm 20$.
+
+Test $x = 1$: $1 - 1 - 15 + 20 = 5 \neq 0$.
+
+$x = 2$: $8 - 4 - 30 + 20 = (8-4)=4$, $(4-30)= -26$, $(-26 + 20)= -6 \neq 0$.
+
+$x = 5$: $125 - 25 - 75 + 20 = 125 - 25$ is $100$, $100 - 75$ is $25$, $25 + 20$ is $45 \neq 0$.
+
+$x = 4$: $64 - 16 - 60 + 20 = 64 - 16$ is $48$, $48 - 60$ is $-12$, $-12 + 20$ is $8 \neq 0$.
+
+$x = -1$: $-1 - 1 + 15 + 20 = 33 \neq 0$.
+
+$x = 2$ again? Wait, already tried. How about $x = 5$? Wait, tried that. Maybe $x = 10$? Probably too big. Let me check $x = 2$ again. Wait, maybe I made a mistake.
+
+Wait, $x=2$: $8 - 4 - 30 + 20 = (8 - 4) = 4$; $(4 - 30) = -26$; $(-26 + 20) = -6$. Correct. Not zero.
+
+$x= -2$: $-8 - 4 + 30 + 20 = (-12) + 50 = 38 \neq 0$.
+
+$x= 5$? Wait, tried that. How about $x= 4$? $64 - 16 - 60 + 20 = 8$. Not zero. Maybe $x= 5/ $ something? Wait, maybe I need to try another approach. Maybe factor by grouping?
+
+Looking at $x^3 - x^2 - 15x + 20$. Let me group terms:
+\[(x^3 - x^2) + (-15x + 20) = x^2(x - 1) - 5(3x - 4).\]
+Hmm, not helpful. Alternatively, maybe different grouping?
+
+Alternatively, maybe there's a typo? Wait, let me check my synthetic division again. Original polynomial was $x^4 - 16x^2 + 5x + 20$. When I divided by $(x + 1)$, the coefficients were $1, 0, -16, 5, 20$. Synthetic division steps:
+
+Bring down $1$. Multiply by $-1$: $-1$. Add to next coefficient: $0 + (-1) = -1$. Multiply by $-1$: $1$. Add to next coefficient: $-16 + 1 = -15$. Multiply by $-1$: $15$. Add to next coefficient: $5 + 15 = 20$. Multiply by $-1$: $-20$. Add to last coefficient: $20 + (-20) = 0$. Correct. So the quotient is $x^3 - x^2 - 15x + 20$. So that's correct.
+
+Alternatively, maybe there's another rational root. Let me check $x= 5$ again. Wait, $x=5$: $125 - 25 - 75 + 20 = 125 - 25$ is $100$, $100 - 75$ is $25$, $25 + 20$ is $45$. Not zero. How about $x= 4$? $64 - 16 - 60 + 20 = 8$. Not zero. $x= 3$? $27 - 9 - 45 + 20 = (27-9)=18$, $(18-45)= -27$, $(-27 + 20)= -7$. Not zero. $x= 2.5$? Maybe not rational. Alternatively, maybe I made a mistake in the earlier steps?
+
+Wait, let me check if there's another root. Maybe $x= -2$? Let me check $x=-2$ in the cubic: $(-8) - 4 - (-30) + 20 = -8 - 4 + 30 + 20 = 38$. Not zero. Hmm. Maybe I need to use the rational root theorem again. Wait, maybe I missed a possible root? Let me check $x= 5$ again. No. How about $x= 10$? $1000 - 100 - 150 + 20 = 1000 - 100$ is $900$, $900 - 150$ is $750$, $750 + 20$ is $770$. Not zero. Maybe $x= -4$? $(-64) - 16 - (-60) + 20 = -64 - 16 + 60 + 20 = (-80) + 80 = 0!$ Oh! $x = -4$ is a root!
+
+Wait, let me check that again. If $x = -4$, then:
+\[x^3 - x^2 - 15x + 20 = (-4)^3 - (-4)^2 - 15(-4) + 20 = -64 - 1\]
+
+\textcolor{red}{\textbf{[The output was truncated because it exceeded the context length!]}}
+
+\end{tcolorbox}
+
+
+\end{document}

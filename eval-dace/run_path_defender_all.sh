@@ -36,8 +36,12 @@ set -o pipefail
 # ============================================================
 # 统一配置 (path-based defender)
 # ============================================================
-MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-2026-05-03_14-30-23/global_step_300/defender/actor/huggingface"
-MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
+# MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-2026-05-03_14-30-23/global_step_300/defender/actor/huggingface"
+# MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
+# MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-defender1st_2026-05-03_14-47-05/global_step_300/defender/actor/huggingface"
+# MODEL_NAME="DACE-Qwen2.5-7B-v4-step300"
+MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Llama3.1_8B_Instruct-w_dace_sft_v4-2026-05-05_14-04-57/global_step_300/defender/actor/huggingface"
+MODEL_NAME="DACE-Llama3.1-8B-v4-attacker1st-step300"
 
 REPO_ROOT="/mnt/shared-storage-user/yupeng/MAGIC"
 EVAL_DACE="$REPO_ROOT/eval-dace"
