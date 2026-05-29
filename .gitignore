@@ -44,4 +44,5 @@ eval-dace/AISafetyLab/
 eval-dace/OpenRT/results/
 eval-dace/safety-eval-fork/evaluation/tasks/generation/codex_eval/humanevalpack/
 eval-dace/safety-eval-fork/evaluation/tasks/generation/or_bench/strongreject/
-eval-dace/safety-eval-fork/evaluation/tasks/generation/x-teaming/
+eval-dace/safety-eval-fork/evaluation/tasks/generation/x-teaming/logs/
+eval-dace/safety-eval-fork/evaluation/tasks/generation/x-teaming/attacks/
