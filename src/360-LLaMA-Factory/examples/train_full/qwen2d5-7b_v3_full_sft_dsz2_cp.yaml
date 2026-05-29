@@ -20,7 +20,7 @@ preprocessing_num_workers: 16
 # output_dir: /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/wenxiaoyu/game_sft/saves/qwen2.5-7BI_cot_w_harm_72b_wocode/full/sft
 output_dir: /mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-sft/qwen2d5-7b_v3_full_sft_dsz2_cp
 logging_steps: 1
-save_steps: 1000000
+save_steps: 100000000
 plot_loss: true
 overwrite_output_dir: true
 
@@ -28,7 +28,7 @@ overwrite_output_dir: true
 per_device_train_batch_size: 1
 gradient_accumulation_steps: 2
 learning_rate: 5.0e-6
-num_train_epochs: 30
+num_train_epochs: 300
 lr_scheduler_type: cosine
 warmup_ratio: 0.1
 bf16: true

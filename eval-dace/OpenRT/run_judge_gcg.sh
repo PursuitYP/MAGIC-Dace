@@ -3,8 +3,8 @@
 # Configuration
 # export OPENAI_API_KEY="sk-xI8zGRXkgJzoejUP7KtcBbRfqNazmWnFqSNuw6zMn5rZClFy"
 # export OPENAI_BASE_URL="https://api.boyuerichdata.opensphereai.com/v1"
-# export OPENAI_API_KEY="sk-ua4rD1WerZKpDyb7JHOSKxVvMmvMZIKi6rXGPotdX9nfxNXr"
-export OPENAI_API_KEY="sk-K6VceMUqp4nb0awvQ6Mp8leG4HDsqJ557AW1r6Z8umNpnRX2"     # api-key from jc
+export OPENAI_API_KEY="sk-ua4rD1WerZKpDyb7JHOSKxVvMmvMZIKi6rXGPotdX9nfxNXr"
+# export OPENAI_API_KEY="sk-K6VceMUqp4nb0awvQ6Mp8leG4HDsqJ557AW1r6Z8umNpnRX2"     # api-key from jc
 export OPENAI_BASE_URL="http://35.220.164.252:3888/v1/"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -16,8 +16,16 @@ ATTACKS="gcg"
 # TIMESTAMP="20260430_191400"    # replace with fixed timestamp
 # MODEL_NAME="DACE-Qwen2.5-7B-v4-step300"
 # TIMESTAMP="20260504_231641"
-MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
-TIMESTAMP="20260506_083014"
+# MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
+# TIMESTAMP="20260506_083014"
+# MODEL_NAME="DACE-Qwen2.5-14B-v4-attacker1st-step300"
+# TIMESTAMP="20260522_191924"   # attacker1st replace with real timestamp
+# MODEL_NAME="DACE-Qwen2.5-14B-v4-defender1st-step300"
+# TIMESTAMP="20260522_104901"   # run defender1st evaluation first
+# MODEL_NAME="DACE-Llama3.1-8B-v4-attacker1st-step300"
+# TIMESTAMP="20260528_103941"   # run atacker1st evaluation first
+MODEL_NAME="DACE-Llama3.1-8B-v4-defender1st-step300"
+TIMESTAMP="20260528_152106"   # defender1st replace with real timestamp
 if [ "$#" -gt 0 ]; then
   TARGET_DIRS=("$@")
 else

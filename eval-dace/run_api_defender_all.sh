@@ -29,7 +29,7 @@
 #   - 原脚本里所有 ### dace: ... ### 注释（tiktoken、alpaca annotator、HF_HUB_CACHE 等）都按原位保留                                                                                                                  
                                                                                                                                                                                                                     
 #   直接运行：                                                                                                                                                                                                        
-#   bash eval-dace/run_path_defender_all.sh                                                                                                                                                                           
+#   bash eval-dace/run_path_defender_all.sh  # 需要申请两张卡
 #   bash eval-dace/run_api_defender_all.sh   # 跑前自行切部署                                                                                                                                                         
 
 
@@ -40,11 +40,13 @@ set -o pipefail
 # ============================================================
 # MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
 # MODEL_NAME="DACE-Qwen2.5-7B-v4-step300"
-MODEL_NAME="DACE-Llama3.1-8B-v4-attacker1st-step300"
+# MODEL_NAME="DACE-Llama3.1-8B-v4-attacker1st-step300"
+# MODEL_NAME="DACE-Qwen2.5-14B-v4-attacker1st-step300"
+MODEL_NAME="DACE-Qwen2.5-14B-v4-defender1st-step300"
 
 # defender API：URL 不变，用户自行切换模型部署
-# DEFENDER_API_BASE_URL="http://s-20260429151904-5j4n7-decode.ailab-safethm.svc:28658/v1"
-DEFENDER_API_BASE_URL="http://s-20260506181828-86bsj-decode.ailab-safethm.svc:28658/v1/"
+DEFENDER_API_BASE_URL="http://s-20260429151904-5j4n7-decode.ailab-safethm.svc:28658/v1"
+# DEFENDER_API_BASE_URL="http://s-20260506181828-86bsj-decode.ailab-safethm.svc:28658/v1/"
 DEFENDER_API_KEY="FAKE_API_KEY"
 DEFENDER_API_MODEL="orm"
 

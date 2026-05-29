@@ -27,7 +27,7 @@
 #   - 原脚本里所有 ### dace: ... ### 注释（tiktoken、alpaca annotator、HF_HUB_CACHE 等）都按原位保留                                                                                                                  
                                                                                                                                                                                                                     
 #   直接运行：                                                                                                                                                                                                        
-#   bash eval-dace/run_path_defender_all.sh                                                                                                                                                                           
+#   bash eval-dace/run_path_defender_all.sh  # 需要申请两张卡
 #   bash eval-dace/run_api_defender_all.sh   # 跑前自行切部署                                                                                                                                                         
 
 
@@ -40,8 +40,12 @@ set -o pipefail
 # MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
 # MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-defender1st_2026-05-03_14-47-05/global_step_300/defender/actor/huggingface"
 # MODEL_NAME="DACE-Qwen2.5-7B-v4-step300"
-MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Llama3.1_8B_Instruct-w_dace_sft_v4-2026-05-05_14-04-57/global_step_300/defender/actor/huggingface"
-MODEL_NAME="DACE-Llama3.1-8B-v4-attacker1st-step300"
+# MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Llama3.1_8B_Instruct-w_dace_sft_v4-2026-05-05_14-04-57/global_step_300/defender/actor/huggingface"
+# MODEL_NAME="DACE-Llama3.1-8B-v4-attacker1st-step300"
+# MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_14B_Instruct-w_dace_sft_v4-2026-05-14_18-14-59/global_step_300/defender/actor/huggingface"
+# MODEL_NAME="DACE-Qwen2.5-14B-v4-attacker1st-step300"
+MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_14B_Instruct-w_dace_sft_v4-defender1st_2026-05-19_11-10-12/global_step_300/defender/actor/huggingface"
+MODEL_NAME="DACE-Qwen2.5-14B-v4-defender1st-step300"
 
 REPO_ROOT="/mnt/shared-storage-user/yupeng/MAGIC"
 EVAL_DACE="$REPO_ROOT/eval-dace"

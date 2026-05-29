@@ -17,7 +17,9 @@
 
 # rl defender from merged defender checkpoint path
 # export DEFENDER_API_BASE_URL="http://s-20260120150339-pccms-decode.ailab-safethm.svc:22320/v1"
-export DEFENDER_API_BASE_URL="http://s-20260429151904-5j4n7-decode.ailab-safethm.svc:28658/v1"
+# export DEFENDER_API_BASE_URL="http://s-20260429151904-5j4n7-decode.ailab-safethm.svc:28658/v1"
+# export DEFENDER_API_BASE_URL="http://s-20260506181828-86bsj-decode.ailab-safethm.svc:28658/v1"
+export DEFENDER_API_BASE_URL="http://s-20260506181841-rr6rc-decode.ailab-safethm.svc:28658/v1"
 export DEFENDER_API_KEY="FAKE_API_KEY"
 export DEFENDER_API_MODEL="orm"
 
@@ -31,8 +33,8 @@ ATTACKER_ANSWER_EXTRACT="true"
 # Judge/Attacker Configuration (OpenAI/Compatible)
 # Used for judging results
 # export OPENAI_API_KEY="sk-xI8zGRXkgJzoejUP7KtcBbRfqNazmWnFqSNuw6zMn5rZClFy"
-# export OPENAI_API_KEY="sk-ua4rD1WerZKpDyb7JHOSKxVvMmvMZIKi6rXGPotdX9nfxNXr"
-export OPENAI_API_KEY="sk-K6VceMUqp4nb0awvQ6Mp8leG4HDsqJ557AW1r6Z8umNpnRX2"     # api-key from jc
+export OPENAI_API_KEY="sk-ua4rD1WerZKpDyb7JHOSKxVvMmvMZIKi6rXGPotdX9nfxNXr"
+# export OPENAI_API_KEY="sk-K6VceMUqp4nb0awvQ6Mp8leG4HDsqJ557AW1r6Z8umNpnRX2"     # api-key from jc
 # export OPENAI_BASE_URL="https://api.boyuerichdata.opensphereai.com/v1"
 export OPENAI_BASE_URL="http://35.220.164.252:3888/v1/"
 
@@ -65,8 +67,16 @@ EMBEDDING_MODEL="text-embedding-3-small"
 # MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step250"
 # LOCAL_MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-defender1st_2026-05-03_14-47-05/global_step_250/defender/actor/huggingface"
 # MODEL_NAME="DACE-Qwen2.5-7B-v4-step250"
-LOCAL_MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-2026-05-03_14-30-23/global_step_300/defender/actor/huggingface"
-MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
+# LOCAL_MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_7B_Instruct-w_dace_sft_v4-2026-05-03_14-30-23/global_step_300/defender/actor/huggingface"
+# MODEL_NAME="DACE-Qwen2.5-7B-v4-attacker1st-step300"
+# LOCAL_MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_14B_Instruct-w_dace_sft_v4-2026-05-14_18-14-59/global_step_300/defender/actor/huggingface"
+# MODEL_NAME="DACE-Qwen2.5-14B-v4-attacker1st-step300"
+# LOCAL_MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Qwen2.5_14B_Instruct-w_dace_sft_v4-defender1st_2026-05-19_11-10-12/global_step_300/defender/actor/huggingface"
+# MODEL_NAME="DACE-Qwen2.5-14B-v4-defender1st-step300"
+# LOCAL_MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Llama3.1_8B_Instruct-w_dace_sft_v4-2026-05-05_14-04-57/global_step_300/defender/actor/huggingface"
+# MODEL_NAME="DACE-Llama3.1-8B-v4-attacker1st-step300"
+LOCAL_MODEL_PATH="/mnt/shared-storage-gpfs2/wenxiaoyu-gpfs02/yupeng/ckpt/Game-separated/DACE-Diversity-Llama3.1_8B_Instruct-w_dace_sft_v4-defender1st_2026-05-05_14-10-21/global_step_300/defender/actor/huggingface"
+MODEL_NAME="DACE-Llama3.1-8B-v4-defender1st-step300"
 
 
 # ------------------------------------------------------------------------------
