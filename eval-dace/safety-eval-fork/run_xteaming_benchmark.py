@@ -66,7 +66,7 @@ def stage_analyze(x_teaming_dir):
 
 def main():
     parser = argparse.ArgumentParser(description="Run X-Teaming Benchmark Stages")
-    parser.add_argument("--stage", choices=["generate", "attack", "analyze", "all", "attack_analyze"], default="all",
+    parser.add_argument("--stage", choices=["generate", "attack", "analyze", "all", "attack_and_analyze"], default="all",
                         help="Select the stage to run: generate (plans), attack (execute), analyze (metrics), or all (default)")
     args = parser.parse_args()
 
@@ -84,7 +84,7 @@ def main():
         stage_generate(x_teaming_dir)
         stage_attack(x_teaming_dir)
         stage_analyze(x_teaming_dir)
-    elif args.stage == "attack_analyze":
+    elif args.stage == "attack_and_analyze":
         stage_attack(x_teaming_dir)
         stage_analyze(x_teaming_dir)
     elif args.stage == "generate":

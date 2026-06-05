@@ -1,6 +1,11 @@
 import argparse
 import concurrent.futures
 import json
+import os
+
+### dace: point tiktoken to a local o200k_base cache so the metrics step doesn't block ~131s/call fetching it from openaipublic.blob.core.windows.net (count_tokens() serializes via tiktoken's global registry lock); see target_model.py ###
+# Must be set before the first tiktoken.encoding_for_model() call (env var is read at lookup time).
+os.environ.setdefault("TIKTOKEN_CACHE_DIR", "/home/yupeng/.cache/tiktoken")
 
 import numpy as np
 import scipy.stats as stats
@@ -145,23 +150,23 @@ def main():
             for future in iterator:
                 pass
 
-        print("Behavior ASR:")
-        if parsed_args.verbose:
-            print(
-                f"Set ASR     \t{len(metrics['successful_sets'])}/{len(metrics['all_sets'])}\t{100.0 * len(metrics['successful_sets']) / len(metrics['all_sets']):.1f}%"
-            )
-            print(
-                f"Strategy ASR\t{len(metrics['successful_strategies'])}/{metrics['num_strategies']}\t{100.0 * len(metrics['successful_strategies']) / metrics['num_strategies']:.1f}%"
-            )
-            print("Category")
-            for label in sorted(semantic_categories.keys()):
-                collection = semantic_categories[label]
-                print(
-                    f"    {label:<30}\t{len(collection['successful'])}/{len(collection['total'])}\t{100.0 * len(collection['successful']) / len(collection['total']):.1f}%"
-                )
-        print(
-            f"Total\t\t\t\t\t{len(metrics['successful_behaviors'])}/{metrics['num_behaviors']}\t{100.0 * len(metrics['successful_behaviors']) / metrics['num_behaviors']:.1f}%"
-        )
+        # print("Behavior ASR:")
+        # if parsed_args.verbose:
+        #     print(
+        #         f"Set ASR     \t{len(metrics['successful_sets'])}/{len(metrics['all_sets'])}\t{100.0 * len(metrics['successful_sets']) / len(metrics['all_sets']):.1f}%"
+        #     )
+        #     print(
+        #         f"Strategy ASR\t{len(metrics['successful_strategies'])}/{metrics['num_strategies']}\t{100.0 * len(metrics['successful_strategies']) / metrics['num_strategies']:.1f}%"
+        #     )
+        #     print("Category")
+        #     for label in sorted(semantic_categories.keys()):
+        #         collection = semantic_categories[label]
+        #         print(
+        #             f"    {label:<30}\t{len(collection['successful'])}/{len(collection['total'])}\t{100.0 * len(collection['successful']) / len(collection['total']):.1f}%"
+        #         )
+        # print(
+        #     f"Total\t\t\t\t\t{len(metrics['successful_behaviors'])}/{metrics['num_behaviors']}\t{100.0 * len(metrics['successful_behaviors']) / metrics['num_behaviors']:.1f}%"
+        # )
 
         def margin_of_error(x):
             std_dev = np.std(x, ddof=1)
@@ -196,6 +201,25 @@ def main():
         print("Number of Tokens Used:")
         print(
             f"Average\t\t\t\t\t{np.average(metrics['num_tokens']):.3f} ± {margin_of_error(metrics['num_tokens']):.3f}"
+        )
+
+        print("\n===== Summary of Attack Success Rates =====")
+        print("Behavior ASR:")
+        if parsed_args.verbose:
+            print(
+                f"Set ASR     \t{len(metrics['successful_sets'])}/{len(metrics['all_sets'])}\t\t{100.0 * len(metrics['successful_sets']) / len(metrics['all_sets']):.1f}%"
+            )
+            print(
+                f"Strategy ASR\t{len(metrics['successful_strategies'])}/{metrics['num_strategies']}\t{100.0 * len(metrics['successful_strategies']) / metrics['num_strategies']:.1f}%"
+            )
+            print("Category")
+            for label in sorted(semantic_categories.keys()):
+                collection = semantic_categories[label]
+                print(
+                    f"    {label:<30}\t{len(collection['successful'])}/{len(collection['total'])}\t{100.0 * len(collection['successful']) / len(collection['total']):.1f}%"
+                )
+        print(
+            f"Total\t\t\t\t\t{len(metrics['successful_behaviors'])}/{metrics['num_behaviors']}\t{100.0 * len(metrics['successful_behaviors']) / metrics['num_behaviors']:.1f}%"
         )
 
 

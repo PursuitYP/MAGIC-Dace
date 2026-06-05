@@ -1,8 +1,8 @@
 attacker:
   provider: "openai"
-  model: "Qwen2.5-32B-IT"
-  base_url: ""
-  api_key: ""
+  model: "orm"
+  base_url: "http://s-20260603103251-t5k9g-decode.ailab-safethm.svc:28618/v1"
+  api_key: "FAKE_API_KEY"
   temperature: 0.3
   max_retries: 20
   max_turns: 3
@@ -16,7 +16,7 @@ attacker:
 target:
   provider: "openai"
   model: "orm"
-  base_url: “”
+  base_url: "http://s-20260429151904-5j4n7-decode.ailab-safethm.svc:28658/v1"
   api_key: "FAKE_API_KEY"
   temperature: 0
   max_retries: 20
@@ -24,8 +24,8 @@ target:
 textgrad:
   enabled: true
   provider: "openai"
-  model: "Qwen2.5-32B-IT"
-  base_url: ""
+  model: "orm"
+  base_url: "http://s-20260603103251-t5k9g-decode.ailab-safethm.svc:28618/v1"
   api_key: "FAKE_API_KEY"
   temperature: 0
   max_retries: 20
@@ -55,5 +55,5 @@ attack_plan_generator:
 evaluation:
   use_gpt_judge: true
   judge_model: "gpt-4o"
-  base_url: ""
-  api_key: ""
+  base_url: "http://35.220.164.252:3888/v1/"
+  api_key: "sk-ua4rD1WerZKpDyb7JHOSKxVvMmvMZIKi6rXGPotdX9nfxNXr"

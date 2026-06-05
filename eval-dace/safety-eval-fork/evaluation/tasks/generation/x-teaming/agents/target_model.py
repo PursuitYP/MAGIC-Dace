@@ -1,4 +1,10 @@
+import os
+
 from typing import Dict
+
+### dace: point tiktoken to a local o200k_base cache so offline nodes don't block ~131s/call trying to fetch it from openaipublic.blob.core.windows.net (serializes all worker threads via tiktoken's global registry lock) ###
+# Must be set before the first tiktoken.encoding_for_model() call (it reads the env var at lookup time).
+os.environ.setdefault("TIKTOKEN_CACHE_DIR", "/home/yupeng/.cache/tiktoken")
 
 import tiktoken
 from textgrad import Variable

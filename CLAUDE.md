@@ -82,6 +82,17 @@ Four evaluation suites in `eval/`:
 
 See `eval/README.md` for detailed instructions.
 
+### Known Issue: tiktoken offline-download hang (huge eval slowdown)
+
+On offline GPU/compute nodes, `tiktoken` blocks trying to fetch its BPE vocab from `openaipublic.blob.core.windows.net`. Because `tiktoken.get_encoding` holds a global registry lock, the first thread stalls on the download timeout while **all other worker threads serialize behind the lock** — turning a ~1s op into ~131s/call and slowing the whole eval ~40x. Symptom in `py-spy dump --pid <pid>`: workers stuck in `tiktoken/registry.py get_encoding`, one in `urllib3 create_connection`; process `wchan=futex_wait_queue_me`. The LLM endpoints (attacker/target/judge) are NOT the cause even when judge calls appear right after the slow op in logs.
+
+Fix = point `TIKTOKEN_CACHE_DIR` at a pre-populated cache. The cache filename must be `sha1(<download_url>).hexdigest()` (not the original filename). Two suites need **different vocabs**:
+
+- **x-teaming** (`eval-dace/safety-eval-fork/.../x-teaming/`, conda env `x-teaming`, py3.11) — needs **`o200k_base`** (for `gpt-4o-2024-08-06`). Download URL `https://openaipublic.blob.core.windows.net/encodings/o200k_base.tiktoken` (expected sha256 `446a9538...`), cache key `fb374d419588a4632f3f557e76b4b70aebbca790`. **Two separate scripts call `tiktoken.encoding_for_model("gpt-4o-2024-08-06")` and each needs the fix independently** — the attack run (`agents/target_model.py:truncate_response()`) AND the metrics step (`analytics/metrics.py:count_tokens()`, runs as `python analytics/metrics.py <timestamp> -v`; `metrics.py` is a standalone entrypoint that does NOT import `target_model`). Both fixed in-code via `os.environ.setdefault("TIKTOKEN_CACHE_DIR", "/home/yupeng/.cache/tiktoken")` before `import tiktoken` (set before first `encoding_for_model` call; env var is read at lookup time). A verified copy of the vocab exists at `/mnt/shared-storage-user/wenxiaoyu/models/gptencodings/o200k_base.tiktoken`.
+- **olmes** (`eval-dace/olmes/`, conda env `olmes`, py3.10) — uses litellm's **`cl100k_base`**. Fixed in `run_7_benchmarks_eval.sh` via `export TIKTOKEN_CACHE_DIR=$CONDA_PREFIX/lib/python3.10/site-packages/litellm/litellm_core_utils/tokenizers`. Note: litellm only bundles `cl100k_base`, so this dir does NOT satisfy x-teaming's `o200k_base` need.
+
+Debugging lesson: when a process is slow but the LLM endpoints test fast in isolation, `py-spy dump` the running PID to read thread stacks instead of guessing from log timestamps. Verify you're probing in the **same conda env** that runs the benchmark (the base env may lack `textgrad`/`openai`).
+
 ## Code Comment Convention
 
 When modifying code, always add a standardized annotation comment above the new or changed module/function, using the following format:
